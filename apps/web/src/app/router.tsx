@@ -1,17 +1,55 @@
 import { useEffect, useMemo, useState } from "react";
 
+export const APP_BASE_PATH = "/Amax";
+
 export type Route = {
   path: string;
   parts: string[];
 };
 
-function readHashPath(): string {
+function normalizeRoutePath(path: string): string {
+  const value = path.startsWith("/") ? path : `/${path}`;
+  return value.replace(/\/+/g, "/") || "/";
+}
+
+function isAppPath(pathname: string): boolean {
+  return pathname === APP_BASE_PATH || pathname.startsWith(`${APP_BASE_PATH}/`);
+}
+
+function readLegacyHashPath(): string | null {
   const value = window.location.hash.replace(/^#/, "");
-  return value || "/";
+  return value.startsWith("/") ? normalizeRoutePath(value) : null;
+}
+
+function readBrowserPath(): string {
+  const { pathname } = window.location;
+
+  if (!isAppPath(pathname)) {
+    return "/";
+  }
+
+  const value = pathname.slice(APP_BASE_PATH.length);
+  return normalizeRoutePath(value || "/");
+}
+
+function toBrowserPath(path: string): string {
+  const routePath = normalizeRoutePath(path);
+  return routePath === "/" ? APP_BASE_PATH : `${APP_BASE_PATH}${routePath}`;
+}
+
+function syncAddressToBasePath(): void {
+  const legacyHashPath = readLegacyHashPath();
+
+  if (!legacyHashPath && isAppPath(window.location.pathname)) {
+    return;
+  }
+
+  window.history.replaceState({}, "", toBrowserPath(legacyHashPath ?? readBrowserPath()));
 }
 
 export function navigate(path: string): void {
-  window.location.hash = path;
+  window.history.pushState({}, "", toBrowserPath(path));
+  window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
 export function navigateBack(fallbackPath = "/"): void {
@@ -23,13 +61,16 @@ export function navigateBack(fallbackPath = "/"): void {
   navigate(fallbackPath);
 }
 
-export function useHashRoute(): Route {
-  const [path, setPath] = useState(readHashPath);
+export function useAppRoute(): Route {
+  const [path, setPath] = useState(readBrowserPath);
 
   useEffect(() => {
-    const onHashChange = () => setPath(readHashPath());
-    window.addEventListener("hashchange", onHashChange);
-    return () => window.removeEventListener("hashchange", onHashChange);
+    const onRouteChange = () => setPath(readBrowserPath());
+
+    syncAddressToBasePath();
+    onRouteChange();
+    window.addEventListener("popstate", onRouteChange);
+    return () => window.removeEventListener("popstate", onRouteChange);
   }, []);
 
   return useMemo(

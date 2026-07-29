@@ -9,7 +9,7 @@ import { SettingsPage } from "../pages/settings/SettingsPage";
 import { TodayPage } from "../pages/today/TodayPage";
 import { WorkoutDetailPage } from "../pages/workout-detail/WorkoutDetailPage";
 import { WorkoutEditorPage } from "../pages/workout-editor/WorkoutEditorPage";
-import { navigate, useHashRoute } from "./router";
+import { navigate, useAppRoute } from "./router";
 
 function resolvePage(parts: string[]) {
   if (parts.length === 0) {
@@ -63,7 +63,7 @@ const navItems = [
 ];
 
 export function App() {
-  const route = useHashRoute();
+  const route = useAppRoute();
   const isExerciseDetail = route.parts[0] === "exercises" && Boolean(route.parts[1]);
   const isWorkoutDetail =
     route.parts[0] === "workouts" && Boolean(route.parts[1]) && route.parts[1] !== "new";

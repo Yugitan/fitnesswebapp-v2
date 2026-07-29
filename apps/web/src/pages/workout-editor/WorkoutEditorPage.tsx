@@ -27,6 +27,7 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
   const [bundle, setBundle] = useState<WorkoutBundle | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const returnToRecord = new URLSearchParams(window.location.search).get("returnTo") === "record";
 
   async function refresh(targetDate = date) {
     if (workoutId) {
@@ -78,7 +79,14 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
         </div>
         <button
           className="text-action"
-          onClick={() => navigateBack(bundle ? `/workouts/${bundle.workout.id}` : "/record")}
+          onClick={() => {
+            if (returnToRecord) {
+              navigate("/record");
+              return;
+            }
+
+            navigateBack(bundle ? `/workouts/${bundle.workout.id}` : "/record");
+          }}
           type="button"
         >
           完成

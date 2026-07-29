@@ -54,7 +54,7 @@ export function TodayPage() {
           <span>{formatVolume(summary.totalVolume)}</span>
         </div>
         <div className="hero-actions">
-          <button className="btn btn-primary" onClick={() => navigate("/workouts/new")} type="button">
+          <button className="btn btn-primary" onClick={() => navigate("/workouts/new?returnTo=record")} type="button">
             <PlusCircle size={18} />
             <span>开始记录</span>
           </button>
