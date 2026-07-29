@@ -34,28 +34,29 @@ export function ExercisesPage() {
   const { exercises, loading, error } = useExercises();
   const { favoriteSet, toggle } = useFavorites();
   const [query, setQuery] = useState("");
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
   const [bodyPart, setBodyPart] = useState("all");
   const [equipment, setEquipment] = useState("all");
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const hasActiveFilters = bodyPart !== "all" || equipment !== "all";
+  const hasActiveFilters = favoriteOnly || bodyPart !== "all" || equipment !== "all";
 
   const results = useMemo(() => {
     const filtered = filterExercises(exercises, {
       query,
-      bodyPart: bodyPart === FAVORITES_FILTER ? "all" : bodyPart,
+      bodyPart,
       equipment,
     });
 
     const prioritized = filtered.filter((exercise) => {
-      return bodyPart !== FAVORITES_FILTER || favoriteSet.has(exercise.id);
+      return !favoriteOnly || favoriteSet.has(exercise.id);
     });
 
     return prioritized.slice(0, 80);
-  }, [bodyPart, equipment, exercises, favoriteSet, query]);
+  }, [bodyPart, equipment, exercises, favoriteOnly, favoriteSet, query]);
 
   const emptyMessage =
-    bodyPart === FAVORITES_FILTER
-      ? "还没有收藏动作。点一下动作卡片右上角的爱心，这里就会显示它们。"
+    favoriteOnly
+      ? "没有符合条件的收藏动作。换个部位或器械试试。"
       : "没有找到相关动作，试试“卧推”“深蹲”“卷腹”。";
 
   return (
@@ -89,9 +90,20 @@ export function ExercisesPage() {
             <div className="filter-row" aria-label="动作范围和部位筛选">
               {bodyPartFilters.map(([value, label]) => (
                 <button
-                  className={bodyPart === value ? "chip is-active" : "chip"}
+                  className={
+                    value === FAVORITES_FILTER
+                      ? favoriteOnly ? "chip is-active" : "chip"
+                      : bodyPart === value ? "chip is-active" : "chip"
+                  }
                   key={value}
-                  onClick={() => setBodyPart(value)}
+                  onClick={() => {
+                    if (value === FAVORITES_FILTER) {
+                      setFavoriteOnly((active) => !active);
+                      return;
+                    }
+
+                    setBodyPart(value);
+                  }}
                   type="button"
                 >
                   {label}

@@ -1,7 +1,7 @@
 import { summarizeWorkout } from "@xiaobai-amax/domain";
 import { getWorkoutBundle, getWorkoutBundleByDate, listWorkouts } from "@xiaobai-amax/local-db";
 import { formatVolume } from "@xiaobai-amax/utils";
-import { History, Library, PlusCircle, Search, Settings } from "lucide-react";
+import { Heart, History, Library, PlusCircle, Search, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { WorkoutSummaryCard } from "../../entities/workout/workout-summary-card";
 import { useExercises } from "../../shared/hooks/use-exercises";
@@ -70,9 +70,9 @@ export function TodayPage() {
           <Search size={22} />
           <span>搜动作</span>
         </button>
-        <button onClick={() => navigate("/workouts/new")} type="button">
-          <PlusCircle size={22} />
-          <span>记训练</span>
+        <button onClick={() => navigate("/favorites")} type="button">
+          <Heart size={22} fill="none" />
+          <span>看收藏</span>
         </button>
         <button onClick={() => navigate("/history")} type="button">
           <History size={22} />

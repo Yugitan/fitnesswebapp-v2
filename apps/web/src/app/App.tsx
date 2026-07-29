@@ -2,6 +2,7 @@ import { Dumbbell, History, Home, PlusCircle } from "lucide-react";
 import { useEffect } from "react";
 import { ExerciseDetailPage } from "../pages/exercises/ExerciseDetailPage";
 import { ExercisesPage } from "../pages/exercises/ExercisesPage";
+import { FavoritesPage } from "../pages/favorites/FavoritesPage";
 import { HistoryPage } from "../pages/history/HistoryPage";
 import { RecordPage } from "../pages/record/RecordPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
@@ -37,6 +38,10 @@ function resolvePage(parts: string[]) {
 
   if (parts[0] === "history") {
     return <HistoryPage />;
+  }
+
+  if (parts[0] === "favorites") {
+    return <FavoritesPage />;
   }
 
   if (parts[0] === "record") {
