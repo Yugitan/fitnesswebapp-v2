@@ -1,0 +1,30 @@
+{
+  "name": "xiaobai-amax",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @xiaobai-amax/web run dev",
+    "start:page": "bash scripts/start-web.sh",
+    "build": "npm --workspace @xiaobai-amax/web run build",
+    "preview": "npm --workspace @xiaobai-amax/web run preview",
+    "typecheck": "tsc -p tsconfig.base.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@types/node": "^22.13.14",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.5"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
