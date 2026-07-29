@@ -142,7 +142,7 @@ export function HistoryPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header className="page-header main-tab-header">
         <div>
           <p className="eyebrow">本地记录</p>
           <h1>训练历史</h1>

@@ -35,7 +35,7 @@ export function TodayPage() {
 
   return (
     <div className="page">
-      <header className="page-header">
+      <header className="page-header main-tab-header">
         <div>
           <p className="eyebrow">小白Amax</p>
           <h1>今日训练</h1>

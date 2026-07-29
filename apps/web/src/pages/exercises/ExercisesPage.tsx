@@ -62,7 +62,7 @@ export function ExercisesPage() {
   return (
     <div className="page">
       <div className="sticky-search">
-        <header className="page-header compact">
+        <header className="page-header main-tab-header">
           <div>
             <p className="eyebrow">{exercises.length.toLocaleString("zh-CN")} 个动作</p>
             <h1>动作库</h1>

@@ -62,7 +62,7 @@ export function RecordPage() {
 
   return (
     <div className="page record-page">
-      <header className="page-header">
+      <header className="page-header main-tab-header">
         <div>
           <p className="eyebrow">本地自动保存</p>
           <h1>记录训练</h1>
