@@ -1,0 +1,9 @@
+{
+  "name": "@xiaobai-amax/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "bash ../../scripts/start-api.sh --reload",
+    "start": "bash ../../scripts/start-api.sh"
+  }
+}

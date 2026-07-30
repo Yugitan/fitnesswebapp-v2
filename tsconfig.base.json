@@ -19,6 +19,7 @@
     "paths": {
       "@xiaobai-amax/domain": ["packages/domain/src/index.ts"],
       "@xiaobai-amax/exercise-data": ["packages/exercise-data/src/index.ts"],
+      "@xiaobai-amax/data-client": ["packages/data-client/src/index.ts"],
       "@xiaobai-amax/local-db": ["packages/local-db/src/index.ts"],
       "@xiaobai-amax/ui": ["packages/ui/src/index.ts"],
       "@xiaobai-amax/utils": ["packages/utils/src/index.ts"]

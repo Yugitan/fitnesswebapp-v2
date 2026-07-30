@@ -1,7 +1,7 @@
 import {
   listFavoriteExerciseIds,
   toggleFavoriteExercise,
-} from "@xiaobai-amax/local-db";
+} from "@xiaobai-amax/data-client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 export function useFavorites() {

@@ -1,6 +1,6 @@
 import type { WorkoutBundle } from "@xiaobai-amax/domain";
 import { summarizeWorkout } from "@xiaobai-amax/domain";
-import { getWorkoutBundle, listWorkouts } from "@xiaobai-amax/local-db";
+import { listMonthWorkoutBundles } from "@xiaobai-amax/data-client";
 import { formatVolume } from "@xiaobai-amax/utils";
 import { CalendarDays, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -67,6 +67,7 @@ export function HistoryPage() {
   const { byId } = useExercises();
   const [bundles, setBundles] = useState<WorkoutBundle[]>([]);
   const [selectedMonthDate, setSelectedMonthDate] = useState(() => clampMonthDate(new Date()));
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(() => new Set());
   const [monthControlsVisible, setMonthControlsVisible] = useState(false);
   const currentMonth = useMemo(() => getMonthInfo(getCurrentMonthDate()), []);
   const selectedMonth = useMemo(() => getMonthInfo(selectedMonthDate), [selectedMonthDate]);
@@ -93,21 +94,18 @@ export function HistoryPage() {
 
   useEffect(() => {
     async function load() {
-      const workouts = await listWorkouts();
-      const loaded = (
-        await Promise.all(workouts.map((workout) => getWorkoutBundle(workout.id)))
-      )
-        .filter(Boolean)
-        .filter((bundle) => summarizeWorkout(bundle).exerciseCount > 0) as WorkoutBundle[];
-      setBundles(loaded);
+      setBundles(await listMonthWorkoutBundles(selectedMonth.monthKey));
     }
 
     load();
-  }, []);
+  }, [selectedMonth.monthKey]);
+
+  useEffect(() => {
+    setSelectedDates(new Set());
+  }, [selectedMonth.monthKey]);
 
   const selectedMonthBundles = useMemo(() => {
-    return bundles
-      .filter((bundle) => bundle.workout.date.startsWith(selectedMonth.monthKey));
+    return bundles;
   }, [bundles, selectedMonth.monthKey]);
 
   const monthSummary = useMemo(() => {
@@ -122,6 +120,20 @@ export function HistoryPage() {
       { workouts: 0, sets: 0, volume: 0 },
     );
   }, [selectedMonthBundles]);
+
+  const displayedBundles = useMemo(() => {
+    if (!selectedDates.size) {
+      return selectedMonthBundles;
+    }
+
+    return selectedMonthBundles.filter((bundle) => selectedDates.has(bundle.workout.date));
+  }, [selectedDates, selectedMonthBundles]);
+
+  const trainingListTitle = selectedDates.size
+    ? `已选 ${selectedDates.size} 天训练`
+    : isCurrentMonth
+      ? "本月训练"
+      : "当月训练";
 
   function shiftMonth(offset: number) {
     setSelectedMonthDate((date) => {
@@ -138,6 +150,20 @@ export function HistoryPage() {
 
   function selectMonth(month: number) {
     setSelectedMonthDate((date) => clampMonthDate(new Date(date.getFullYear(), month - 1, 1)));
+  }
+
+  function toggleDate(date: string) {
+    setSelectedDates((dates) => {
+      const nextDates = new Set(dates);
+
+      if (nextDates.has(date)) {
+        nextDates.delete(date);
+      } else {
+        nextDates.add(date);
+      }
+
+      return nextDates;
+    });
   }
 
   return (
@@ -228,18 +254,36 @@ export function HistoryPage() {
       <section className="calendar-lite">
         {Array.from({ length: selectedMonth.dayCount }, (_, index) => {
           const day = String(index + 1).padStart(2, "0");
+          const date = `${selectedMonth.monthKey}-${day}`;
           const hasWorkout = selectedMonthBundles.some((bundle) => {
-            return bundle.workout.date === `${selectedMonth.monthKey}-${day}`;
+            return bundle.workout.date === date;
           });
-          return <span className={hasWorkout ? "has-workout" : ""} key={day}>{index + 1}</span>;
+          const isSelected = selectedDates.has(date);
+          const className = [
+            hasWorkout ? "has-workout" : "",
+            isSelected ? "is-selected" : "",
+          ].filter(Boolean).join(" ");
+
+          return (
+            <button
+              aria-label={`${selectedMonth.label}${index + 1}日${hasWorkout ? "，有训练记录" : "，无训练记录"}`}
+              aria-pressed={isSelected}
+              className={className}
+              key={day}
+              onClick={() => toggleDate(date)}
+              type="button"
+            >
+              {index + 1}
+            </button>
+          );
         })}
       </section>
 
       <section className="section">
-        <div className="section-title"><h2>{isCurrentMonth ? "本月训练" : "当月训练"}</h2></div>
-        {selectedMonthBundles.length ? (
+        <div className="section-title"><h2>{trainingListTitle}</h2></div>
+        {displayedBundles.length ? (
           <div className="stack">
-            {selectedMonthBundles.map((bundle) => (
+            {displayedBundles.map((bundle) => (
               <WorkoutSummaryCard
                 bundle={bundle}
                 exerciseMap={byId}
@@ -249,7 +293,9 @@ export function HistoryPage() {
             ))}
           </div>
         ) : (
-          <div className="empty-state">这个月还没有训练记录。</div>
+          <div className="empty-state">
+            {selectedDates.size ? "所选日期还没有训练记录。" : "这个月还没有训练记录。"}
+          </div>
         )}
       </section>
     </div>

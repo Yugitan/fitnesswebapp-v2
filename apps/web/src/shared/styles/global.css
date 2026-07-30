@@ -9,6 +9,10 @@
   -webkit-font-smoothing: antialiased;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -748,10 +752,11 @@ button {
 
 .fixed-action {
   position: fixed;
-  right: calc((100vw - min(100vw, 393px)) / 2);
   bottom: 0;
-  left: calc((100vw - min(100vw, 393px)) / 2);
+  left: 50%;
   z-index: 10;
+  width: min(100%, 393px);
+  transform: translateX(-50%);
   border-top: 1px solid #e3e3dc;
   padding: 12px 20px calc(28px + env(safe-area-inset-bottom));
   background: rgba(247, 247, 242, 0.96);
@@ -1230,19 +1235,32 @@ button {
   margin: 18px 0 26px;
 }
 
-.calendar-lite span {
+.calendar-lite button {
   display: grid;
   height: 32px;
   place-items: center;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
   color: #555;
   font-size: 13px;
+  font: inherit;
+  cursor: pointer;
 }
 
-.calendar-lite span.has-workout {
+.calendar-lite button.has-workout {
   background: #ff4d1c;
   color: white;
   font-weight: 800;
+}
+
+.calendar-lite button.is-selected {
+  box-shadow: inset 0 0 0 2px #111;
+}
+
+.calendar-lite button:focus-visible {
+  outline: 2px solid #111;
+  outline-offset: 2px;
 }
 
 .readonly-sets {
@@ -1264,65 +1282,606 @@ button {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
-.note-panel,
-.settings-panel {
+.note-panel {
   display: grid;
   gap: 12px;
   margin-top: 26px;
 }
 
-.note-panel h2,
-.settings-panel h2 {
+.note-panel h2 {
   margin: 0;
   font-size: 18px;
   font-weight: 800;
 }
 
-.note-panel p,
-.settings-panel p {
+.note-panel p {
   margin: 0;
   color: #737373;
   font-size: 14px;
   line-height: 1.6;
 }
 
-.settings-panel:first-of-type {
-  border: 1px solid #dfdfd8;
+.settings-page {
+  padding-top: 16px;
+  padding-bottom: 38px;
+}
+
+.settings-page-header {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.settings-page-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.settings-page-header .eyebrow {
+  margin-bottom: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.settings-account-card {
+  position: relative;
+  overflow: hidden;
   border-radius: 8px;
-  padding: 16px;
-  background: white;
+  padding: 18px;
+  background: #181818;
+  color: #fff;
+}
+
+.settings-account-card::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: #ff4d1c;
+  content: "";
+}
+
+.settings-account-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  color: #ff4d1c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.settings-account-loading {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 13px;
+}
+
+.settings-account-content {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-account-avatar {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 7px;
+  background: #ff4d1c;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.settings-account-copy {
+  min-width: 0;
+}
+
+.settings-account-copy h2,
+.settings-guest-content h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.settings-account-copy p,
+.settings-guest-content p {
+  overflow: hidden;
+  margin: 5px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+}
+
+.settings-account-copy p {
+  white-space: nowrap;
+}
+
+.settings-account-action {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.settings-guest-content {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-guest-content p {
+  max-width: 290px;
+}
+
+.settings-guest-content button {
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 13px;
+  background: #ff4d1c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.settings-data-overview {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid #deded7;
+  border-radius: 8px;
+  padding: 13px 14px;
+  background: #fff;
+}
+
+.settings-data-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 7px;
+  background: #fff0ea;
+  color: #ff4d1c;
+}
+
+.settings-data-overview > div:nth-child(2) {
+  display: grid;
+  gap: 1px;
+}
+
+.settings-data-overview span {
+  color: #777770;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.settings-data-overview strong {
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.settings-data-overview > p {
+  margin: 0;
+  color: #8f8f88;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.7;
+  letter-spacing: 0.08em;
+  text-align: right;
+}
+
+.settings-section {
+  margin-top: 28px;
+}
+
+.settings-section-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.settings-section-title span,
+.settings-section-title small {
+  color: #92928c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.settings-section-title h2 {
+  margin: 3px 0 0;
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.settings-menu {
+  overflow: hidden;
+  border: 1px solid #deded7;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .settings-row {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) 18px;
-  min-height: 56px;
+  width: 100%;
+  grid-template-columns: 38px minmax(0, 1fr) auto 18px;
+  min-height: 66px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  border: 0;
   border-bottom: 1px solid #e3e3dc;
+  padding: 9px 13px;
   background: transparent;
   color: #111;
-  font-size: 14px;
-  font-weight: 800;
   text-align: left;
 }
 
-.settings-row:first-of-type {
-  border-top: 1px solid #e3e3dc;
+.settings-row:last-child {
+  border-bottom: 0;
+}
+
+.settings-row-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 7px;
+  background: #f0f0eb;
+  color: #222;
+}
+
+.settings-row-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.settings-row-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row-copy small {
+  overflow: hidden;
+  color: #85857e;
+  font-size: 10px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row em {
+  border-radius: 4px;
+  padding: 3px 5px;
+  background: #fff0ea;
+  color: #ff4d1c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.08em;
 }
 
 .settings-row.danger {
   color: #d92d20;
 }
 
+.settings-row.danger .settings-row-icon {
+  background: #fff0ef;
+  color: #d92d20;
+}
+
+.settings-row.danger .settings-row-copy small {
+  color: #b77670;
+}
+
 .settings-row-chevron {
+  grid-column: 4;
   justify-self: end;
   color: #9a9a95;
 }
 
-.status-message {
-  color: #008f68 !important;
+.settings-info-row {
+  display: grid;
+  min-height: 66px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #e3e3dc;
+  padding: 9px 13px;
+}
+
+.settings-status-message {
+  margin: 10px 0 0;
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #e9f8f2;
+  color: #008f68;
+  font-size: 11px;
   font-weight: 800;
+}
+
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgba(17, 17, 17, 0.66);
+  backdrop-filter: blur(3px);
+}
+
+.auth-dialog {
+  position: relative;
+  width: min(100%, 393px);
+  max-height: calc(100vh - 14px);
+  overflow-y: auto;
+  border-radius: 8px 8px 0 0;
+  background: #f7f7f2;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.28);
+}
+
+.auth-dialog::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 100%;
+  height: 4px;
+  background: #ff4d1c;
+  content: "";
+}
+
+.auth-hero {
+  position: relative;
+  padding: 24px 22px 20px;
+  background: #181818;
+  color: #fff;
+}
+
+.auth-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.auth-brand-row {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 48px;
+  margin-bottom: 20px;
+  padding-right: 38px;
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #ff4d1c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.auth-kicker {
+  color: rgba(255, 255, 255, 0.38);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+
+.auth-hero h2 {
+  max-width: 310px;
+  margin: 0 0 10px;
+  white-space: pre-line;
+  font-size: 27px;
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+}
+
+.auth-hero > p {
+  max-width: 310px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auth-benefits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.auth-benefits span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  padding: 5px 7px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.auth-benefits svg {
+  color: #ff4d1c;
+}
+
+.auth-body {
+  padding: 18px 20px calc(16px + env(safe-area-inset-bottom));
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 24px;
+  margin: 0 0 18px;
+  border-bottom: 1px solid #deded7;
+}
+
+.auth-tabs button {
+  position: relative;
+  min-height: 38px;
+  border: 0;
+  padding: 0 0 11px;
+  background: transparent;
+  color: #8a8a84;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.auth-tabs button.is-active {
+  color: #111;
+}
+
+.auth-tabs button.is-active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 3px;
+  background: #ff4d1c;
+  content: "";
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 6px;
+  color: #333;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.auth-form input {
+  width: 100%;
+  min-height: 45px;
+  border: 1px solid #d6d6cf;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  font-size: 14px;
+}
+
+.auth-form input:focus {
+  border-color: #ff4d1c;
+  outline: 2px solid rgba(255, 77, 28, 0.12);
+}
+
+.auth-form input::placeholder {
+  color: #adada7;
+}
+
+.auth-error {
+  margin: -2px 0 0;
+  border-left: 3px solid #d92d20;
+  padding: 7px 9px;
+  background: #fff0ef;
+  color: #d92d20;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-submit {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 15px;
+  background: #ff4d1c;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.auth-submit:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.auth-submit:active {
+  transform: scale(0.985);
+}
+
+.auth-guest-action {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 1px solid #d8d8d1;
+  border-radius: 6px;
+  background: transparent;
+  color: #555;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.auth-reminder-note {
+  margin: 9px 0 0;
+  color: #9a9a95;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
 }
 
 .confirm-backdrop {

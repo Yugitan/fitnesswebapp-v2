@@ -8,11 +8,14 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm --workspace @xiaobai-amax/web run dev",
+    "dev": "bash scripts/dev.sh",
+    "dev:web": "npm --workspace @xiaobai-amax/web run dev",
+    "dev:api": "npm --workspace @xiaobai-amax/api run dev",
     "start:page": "bash scripts/start-web.sh",
     "build": "npm --workspace @xiaobai-amax/web run build",
     "preview": "npm --workspace @xiaobai-amax/web run preview",
-    "typecheck": "tsc -p tsconfig.base.json --noEmit"
+    "typecheck": "tsc -p tsconfig.base.json --noEmit",
+    "test:api": "bash scripts/test-api.sh"
   },
   "devDependencies": {
     "@types/react": "^19.1.8",

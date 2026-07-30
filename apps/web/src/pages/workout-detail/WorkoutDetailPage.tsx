@@ -1,5 +1,5 @@
 import { summarizeWorkout, type WorkoutBundle } from "@xiaobai-amax/domain";
-import { getWorkoutBundle } from "@xiaobai-amax/local-db";
+import { getWorkoutBundle } from "@xiaobai-amax/data-client";
 import { formatVolume } from "@xiaobai-amax/utils";
 import { ArrowLeft, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";

@@ -14,3 +14,7 @@ packages/*/node_modules/
 coverage/
 playwright-report/
 test-results/
+data/runtime/
+apps/api/.venv/
+__pycache__/
+.pytest_cache/

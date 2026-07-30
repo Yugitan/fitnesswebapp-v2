@@ -1,6 +1,6 @@
 # 小白Amax — 企业级项目目录结构规范
 
-> 当前产品只做 **动作展示库 + 健身训练记录**。目录设计采用“前端单体应用 + 可扩展工程边界”的方式：MVP 不引入后端，但保留后续扩展空间。
+> 当前产品只做 **动作展示库 + 健身训练记录**。目录设计采用 React 前端 + FastAPI 后端的 monorepo，动作素材静态加载，用户训练数据通过 `/api` 持久化。
 
 ---
 
@@ -9,9 +9,11 @@
 ```txt
 健身webapp/
 ├── apps/
-│   └── web/                         # React + Vite 前端应用
+│   ├── web/                         # React + Vite 前端应用
+│   └── api/                         # FastAPI 后端应用
 ├── packages/
 │   ├── domain/                      # 领域模型、类型、纯业务规则
+│   ├── data-client/                 # 前端 API 数据访问边界
 │   ├── exercise-data/               # 动作数据适配、中文别名、搜索索引构建
 │   ├── local-db/                    # IndexedDB schema、repository、迁移
 │   ├── ui/                          # 可复用 UI 组件和设计 token
@@ -21,29 +23,17 @@
 │   ├── adr/                         # 架构决策记录
 │   ├── project-structure.md         # 本文件
 │   └── figma-prototype-prompt.md    # 原型设计提示词
-├── data/
-│   ├── raw/                         # 外部原始数据，只读，不在业务中直接改
-│   ├── processed/                   # 由脚本生成的应用可用数据
-│   └── dictionaries/                # 中文别名、部位/器械/肌群映射
-├── public-assets/
-│   ├── exercise-images/             # 对外发布的动作缩略图
-│   └── exercise-gifs/               # 对外发布的动作 GIF，按需缓存
-├── tests/
-│   ├── e2e/                         # Playwright 端到端测试
-│   └── fixtures/                    # 测试数据
-├── .github/
-│   └── workflows/                   # CI/CD
+├── tests/                           # 规划目录：Playwright / fixtures
+├── .github/                         # 规划目录：CI/CD
 ├── CONTEXT.md                       # 领域词汇表
 ├── PRD.md                           # 产品需求文档
 ├── package.json                     # workspace 根配置
-├── pnpm-workspace.yaml              # pnpm workspace
+├── package-lock.json                # npm lockfile
 ├── tsconfig.base.json               # TypeScript 基础配置
-├── eslint.config.js                 # 代码规范
-├── prettier.config.js               # 格式化规范
 └── README.md                        # 项目入口说明
 ```
 
-当前已有的 `动作库/exercises-dataset/` 和 `赛博私教skill/` 应视为外部资料来源。正式工程化后，动作库原始数据建议迁移或同步到 `data/raw/exercises-dataset/`；GymBuddy 资料暂不进入 MVP 主链路。
+当前已有的 `动作库/exercises-dataset/` 和 `赛博私教skill/` 应视为外部资料来源。动作库当前由 `packages/exercise-data` 在运行时读取并归一化；GymBuddy 资料暂不进入 MVP 主链路。
 
 ---
 
@@ -52,18 +42,16 @@
 ```txt
 apps/web/
 ├── public/
-│   ├── manifest.webmanifest
-│   ├── icons/
-│   └── robots.txt
+│   └── manifest.webmanifest
 ├── src/
 │   ├── app/                         # 应用装配层
 │   │   ├── App.tsx
-│   │   ├── router.tsx
-│   │   ├── providers.tsx
-│   │   └── error-boundary.tsx
+│   │   └── router.tsx
 │   ├── pages/                       # 路由页面
 │   │   ├── today/
 │   │   ├── exercises/
+│   │   ├── favorites/
+│   │   ├── record/
 │   │   ├── workout-editor/
 │   │   ├── workout-detail/
 │   │   ├── history/
@@ -85,16 +73,16 @@ apps/web/
 │   │   ├── lib/
 │   │   ├── styles/
 │   │   └── assets/
-│   ├── service-worker/              # PWA 和 runtime cache 配置
+│   ├── service-worker/              # 规划目录：PWA 和 runtime cache 配置
 │   ├── main.tsx
 │   └── vite-env.d.ts
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
-├── tailwind.config.ts
-├── postcss.config.js
 └── package.json
 ```
+
+当前应用配置 Vite `base` 为 `/Amax/`。开发和预览服务访问 `/` 时会跳转到 `/Amax`，应用内路由仍以 `/exercises`、`/record`、`/workouts/:id` 这类逻辑路径表达。
 
 ### 2.1 分层规则
 
@@ -121,7 +109,6 @@ packages/domain/
 ├── src/
 │   ├── exercise/
 │   │   ├── exercise.types.ts
-│   │   ├── exercise.mappers.ts
 │   │   └── exercise-search.ts
 │   ├── workout/
 │   │   ├── workout.types.ts
@@ -148,13 +135,10 @@ packages/exercise-data/
 ├── src/
 │   ├── load-exercises.ts
 │   ├── normalize-exercise.ts
-│   ├── build-search-index.ts
+│   ├── translate-exercise-name.ts
+│   ├── dictionaries.ts
 │   └── index.ts
-├── dictionaries/
-│   ├── body-parts.zh.json
-│   ├── equipment.zh.json
-│   ├── muscles.zh.json
-│   └── exercise-aliases.zh.json
+├── dictionaries/                    # 预留目录：后续可拆分 JSON 词典
 ├── package.json
 └── tsconfig.json
 ```
@@ -162,8 +146,8 @@ packages/exercise-data/
 要求：
 
 - 原始动作数据不可直接手改。
-- 中文名称、中文别名、部位映射、器械映射放在 `dictionaries/`。
-- 搜索索引由脚本生成，避免运行时做大量重复转换。
+- 当前中文名称、中文别名、部位映射、器械映射放在 `src/dictionaries.ts`。
+- 后续词典变大后，可拆到 `dictionaries/*.json`，并由脚本生成搜索索引。
 
 ### 3.3 `packages/local-db`
 
@@ -176,7 +160,7 @@ packages/local-db/
 │   ├── repositories/
 │   │   ├── workout.repository.ts
 │   │   ├── favorite-exercise.repository.ts
-│   │   └── settings.repository.ts
+│   │   └── test-data.repository.ts
 │   └── index.ts
 ├── package.json
 └── tsconfig.json
@@ -194,11 +178,7 @@ packages/local-db/
 packages/ui/
 ├── src/
 │   ├── components/
-│   │   ├── button.tsx
-│   │   ├── input.tsx
-│   │   ├── dialog.tsx
-│   │   ├── drawer.tsx
-│   │   └── tabs.tsx
+│   │   └── button.tsx
 │   ├── icons/
 │   ├── tokens/
 │   ├── cn.ts
@@ -215,6 +195,8 @@ packages/ui/
 ---
 
 ## 4. 数据与资源目录
+
+以下是后续工程化建议目录。当前 MVP 仍直接保留并读取 `动作库/exercises-dataset/`，中文映射放在 `packages/exercise-data/src/dictionaries.ts`。
 
 ```txt
 data/
@@ -301,6 +283,8 @@ P0 至少覆盖：
 
 ## 7. 环境与配置
 
+以下为后续多环境部署建议。当前 MVP 暂未引入环境变量解析层。
+
 ```txt
 apps/web/
 ├── .env.example
@@ -346,25 +330,27 @@ CI 至少执行：
 
 ## 9. 当前阶段落地顺序
 
-第一阶段先创建最小可运行结构：
+当前已经落地的最小可运行结构：
 
 ```txt
 apps/web/
 packages/domain/
 packages/exercise-data/
 packages/local-db/
+packages/ui/
+packages/utils/
 docs/
-data/dictionaries/
 scripts/
 ```
 
 第二阶段再补：
 
 ```txt
-packages/ui/
 tests/e2e/
 .github/workflows/
 public-assets/
+data/raw/
+data/processed/
 ```
 
 这样既不会一开始目录空到发虚，也不会把企业级架子搭得比产品还重。

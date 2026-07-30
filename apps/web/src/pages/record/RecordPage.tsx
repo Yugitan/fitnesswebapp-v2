@@ -1,6 +1,6 @@
 import type { WorkoutBundle } from "@xiaobai-amax/domain";
 import { summarizeWorkout } from "@xiaobai-amax/domain";
-import { deleteWorkout, getWorkoutBundle, getWorkoutBundleByDate, listWorkouts } from "@xiaobai-amax/local-db";
+import { deleteWorkout, getTodayWorkout, listRecentWorkoutBundles } from "@xiaobai-amax/data-client";
 import { PlusCircle, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { navigate } from "../../app/router";
@@ -18,19 +18,10 @@ export function RecordPage() {
   const loadWorkouts = useCallback(async (mountGuard?: { current: boolean }) => {
     setIsLoading(true);
     const today = todayDate();
-    const [todayWorkout, workouts] = await Promise.all([
-      getWorkoutBundleByDate(today),
-      listWorkouts(),
+    const [todayWorkout, recent] = await Promise.all([
+      getTodayWorkout(today),
+      listRecentWorkoutBundles(3),
     ]);
-    const recent = (
-      await Promise.all(
-        workouts
-          .map((workout) => getWorkoutBundle(workout.id)),
-      )
-    )
-      .filter(Boolean)
-      .filter((bundle) => summarizeWorkout(bundle).exerciseCount > 0)
-      .slice(0, 3) as WorkoutBundle[];
 
     if (mountGuard && !mountGuard.current) return;
     setTodayBundle(todayWorkout);
@@ -64,7 +55,7 @@ export function RecordPage() {
     <div className="page record-page">
       <header className="page-header main-tab-header">
         <div>
-          <p className="eyebrow">本地自动保存</p>
+          <p className="eyebrow">服务端自动保存</p>
           <h1>记录训练</h1>
         </div>
         <button className="text-action" disabled={isLoading} onClick={openTodayWorkout} type="button">

@@ -91,6 +91,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@xiaobai-amax/domain": path.resolve(dirname, "../../packages/domain/src"),
+      "@xiaobai-amax/data-client": path.resolve(dirname, "../../packages/data-client/src"),
       "@xiaobai-amax/exercise-data": path.resolve(dirname, "../../packages/exercise-data/src"),
       "@xiaobai-amax/local-db": path.resolve(dirname, "../../packages/local-db/src"),
       "@xiaobai-amax/ui": path.resolve(dirname, "../../packages/ui/src"),
@@ -99,6 +100,9 @@ export default defineConfig({
     }
   },
   server: {
+    proxy: {
+      "/api": "http://127.0.0.1:8787",
+    },
     fs: {
       allow: [repoRoot]
     }

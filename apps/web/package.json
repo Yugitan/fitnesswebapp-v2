@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@xiaobai-amax/domain": "file:../../packages/domain",
+    "@xiaobai-amax/data-client": "file:../../packages/data-client",
     "@xiaobai-amax/exercise-data": "file:../../packages/exercise-data",
     "@xiaobai-amax/local-db": "file:../../packages/local-db",
     "@xiaobai-amax/ui": "file:../../packages/ui",

@@ -1,5 +1,6 @@
 import { Dumbbell, History, Home, PlusCircle } from "lucide-react";
 import { useEffect } from "react";
+import { useState } from "react";
 import { ExerciseDetailPage } from "../pages/exercises/ExerciseDetailPage";
 import { ExercisesPage } from "../pages/exercises/ExercisesPage";
 import { FavoritesPage } from "../pages/favorites/FavoritesPage";
@@ -9,6 +10,13 @@ import { SettingsPage } from "../pages/settings/SettingsPage";
 import { TodayPage } from "../pages/today/TodayPage";
 import { WorkoutDetailPage } from "../pages/workout-detail/WorkoutDetailPage";
 import { WorkoutEditorPage } from "../pages/workout-editor/WorkoutEditorPage";
+import { AuthDialog } from "../shared/components/AuthDialog";
+import { useAuth } from "../shared/hooks/use-auth";
+import {
+  dismissAuthPrompt,
+  OPEN_AUTH_DIALOG_EVENT,
+  shouldShowAuthPrompt,
+} from "../shared/lib/auth-dialog";
 import { navigate, useAppRoute } from "./router";
 
 function resolvePage(parts: string[]) {
@@ -64,6 +72,8 @@ const navItems = [
 
 export function App() {
   const route = useAppRoute();
+  const { user, loading: authLoading } = useAuth();
+  const [authOpen, setAuthOpen] = useState(false);
   const isExerciseDetail = route.parts[0] === "exercises" && Boolean(route.parts[1]);
   const isWorkoutDetail =
     route.parts[0] === "workouts" && Boolean(route.parts[1]) && route.parts[1] !== "new";
@@ -72,6 +82,23 @@ export function App() {
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0 });
   }, [route.path]);
+
+  useEffect(() => {
+    if (!authLoading && !user && shouldShowAuthPrompt()) {
+      setAuthOpen(true);
+    }
+  }, [authLoading, user]);
+
+  useEffect(() => {
+    const open = () => setAuthOpen(true);
+    window.addEventListener(OPEN_AUTH_DIALOG_EVENT, open);
+    return () => window.removeEventListener(OPEN_AUTH_DIALOG_EVENT, open);
+  }, []);
+
+  function closeAuthDialog() {
+    dismissAuthPrompt();
+    setAuthOpen(false);
+  }
 
   return (
     <div className="app-shell">
@@ -106,6 +133,11 @@ export function App() {
           </nav>
         ) : null}
       </div>
+      <AuthDialog
+        onClose={closeAuthDialog}
+        onSuccess={() => window.location.reload()}
+        open={authOpen}
+      />
     </div>
   );
 }

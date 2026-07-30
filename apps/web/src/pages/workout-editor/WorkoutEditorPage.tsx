@@ -7,9 +7,10 @@ import {
   deleteWorkoutExercise,
   getOrCreateWorkout,
   getWorkoutBundle,
+  getWorkoutBundleByDate,
   updateSet,
   updateWorkoutNotes,
-} from "@xiaobai-amax/local-db";
+} from "@xiaobai-amax/data-client";
 import { formatVolume } from "@xiaobai-amax/utils";
 import { ArrowLeft, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -27,6 +28,8 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
   const [bundle, setBundle] = useState<WorkoutBundle | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
   const returnToRecord = new URLSearchParams(window.location.search).get("returnTo") === "record";
 
   async function refresh(targetDate = date) {
@@ -39,13 +42,17 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
       return;
     }
 
-    const workout = await getOrCreateWorkout(targetDate);
-    setBundle(await getWorkoutBundle(workout.id));
+    const existing = await getWorkoutBundleByDate(targetDate);
+    setBundle(existing);
   }
 
   useEffect(() => {
     refresh(date);
   }, [date, workoutId]);
+
+  useEffect(() => {
+    setNotes(bundle?.workout.notes ?? "");
+  }, [bundle?.workout.id, bundle?.workout.notes]);
 
   const summary = summarizeWorkout(bundle);
   const pickerResults = useMemo(
@@ -54,11 +61,11 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
   );
 
   async function addExercise(exercise: ExerciseView) {
-    if (!bundle) return;
-    await addExerciseToWorkout(bundle.workout.id, exercise.id);
+    const workout = bundle?.workout ?? await getOrCreateWorkout(date);
+    await addExerciseToWorkout(workout.id, exercise.id);
     setPickerOpen(false);
     setQuery("");
-    refresh();
+    setBundle(await getWorkoutBundle(workout.id));
   }
 
   async function updateTrainingSet(set: TrainingSet, patch: Partial<TrainingSet>) {
@@ -74,7 +81,7 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
           <ArrowLeft size={20} />
         </button>
         <div>
-          <p className="eyebrow">本地自动保存</p>
+          <p className="eyebrow">服务端自动保存</p>
           <h1>记录训练</h1>
         </div>
         <button
@@ -145,25 +152,29 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
                     <span>{set.setNumber}</span>
                     <input
                       inputMode="decimal"
-                      onChange={(event) =>
+                      min="0"
+                      onBlur={(event) =>
                         updateTrainingSet(set, {
                           weightKg: event.target.value ? Number(event.target.value) : undefined,
                         })
                       }
                       placeholder="0"
+                      step="0.5"
                       type="number"
-                      value={set.weightKg ?? ""}
+                      defaultValue={set.weightKg ?? ""}
                     />
                     <input
                       inputMode="numeric"
-                      onChange={(event) =>
+                      min="1"
+                      onBlur={(event) =>
                         updateTrainingSet(set, {
                           reps: event.target.value ? Number(event.target.value) : undefined,
                         })
                       }
                       placeholder="10"
+                      step="1"
                       type="number"
-                      value={set.reps ?? ""}
+                      defaultValue={set.reps ?? ""}
                     />
                     <div className="row-actions">
                       <button
@@ -208,11 +219,23 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
       <label className="field">
         <span>训练备注</span>
         <textarea
-          onBlur={(event) => bundle && updateWorkoutNotes(bundle.workout.id, event.target.value)}
+          maxLength={2000}
+          onBlur={async () => {
+            if (notes === (bundle?.workout.notes ?? "")) return;
+            const workout = bundle?.workout ?? await getOrCreateWorkout(date);
+            await updateWorkoutNotes(workout.id, notes);
+            setSaveMessage("备注已保存");
+            setBundle(await getWorkoutBundle(workout.id));
+          }}
+          onChange={(event) => {
+            setNotes(event.target.value);
+            setSaveMessage("");
+          }}
           placeholder="状态、感受、器械占用情况..."
-          defaultValue={bundle?.workout.notes ?? ""}
+          value={notes}
         />
       </label>
+      {saveMessage ? <p className="status-message">{saveMessage}</p> : null}
 
       {pickerOpen ? (
         <div className="drawer-backdrop" onClick={() => setPickerOpen(false)}>

@@ -1,0 +1,11 @@
+{
+  "name": "@xiaobai-amax/data-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@xiaobai-amax/domain": "file:../domain"
+  }
+}

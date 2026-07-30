@@ -1,5 +1,5 @@
 import { summarizeWorkout } from "@xiaobai-amax/domain";
-import { getWorkoutBundle, getWorkoutBundleByDate, listWorkouts } from "@xiaobai-amax/local-db";
+import { getTodayWorkout, listRecentWorkoutBundles } from "@xiaobai-amax/data-client";
 import { formatVolume } from "@xiaobai-amax/utils";
 import { Heart, History, Library, PlusCircle, Search, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,13 +16,10 @@ export function TodayPage() {
 
   useEffect(() => {
     async function load() {
-      const [today, workouts] = await Promise.all([getWorkoutBundleByDate(todayDate()), listWorkouts()]);
-      const recent = (
-        await Promise.all(workouts.map((workout) => getWorkoutBundle(workout.id)))
-      )
-        .filter(Boolean)
-        .filter((bundle) => summarizeWorkout(bundle).exerciseCount > 0)
-        .slice(0, 3) as WorkoutBundle[];
+      const [today, recent] = await Promise.all([
+        getTodayWorkout(todayDate()),
+        listRecentWorkoutBundles(3),
+      ]);
 
       setTodayBundle(today);
       setRecentBundles(recent);
@@ -37,7 +34,7 @@ export function TodayPage() {
     <div className="page">
       <header className="page-header main-tab-header">
         <div>
-          <p className="eyebrow">小白Amax</p>
+          <p className="eyebrow">小白Amax · 云端记录</p>
           <h1>今日训练</h1>
         </div>
         <button className="icon-button" onClick={() => navigate("/settings")} type="button">

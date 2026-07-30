@@ -1,9 +1,10 @@
-import { addExerciseToToday } from "@xiaobai-amax/local-db";
+import { addExerciseToToday } from "@xiaobai-amax/data-client";
 import { ArrowLeft, Heart, PlusCircle } from "lucide-react";
 import { useMemo } from "react";
 import { navigate, navigateBack } from "../../app/router";
 import { useExercises } from "../../shared/hooks/use-exercises";
 import { useFavorites } from "../../shared/hooks/use-favorites";
+import { todayDate } from "../../shared/lib/dates";
 
 type ExerciseDetailPageProps = {
   exerciseId: string;
@@ -24,7 +25,7 @@ export function ExerciseDetailPage({ exerciseId }: ExerciseDetailPageProps) {
   }
 
   async function addToToday(targetExerciseId: string) {
-    await addExerciseToToday(targetExerciseId);
+    await addExerciseToToday(targetExerciseId, todayDate());
     navigate("/workouts/new");
   }
 
