@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, Optional
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, delete, select, text
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, create_engine, delete, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
@@ -75,6 +75,18 @@ class FavoriteExercise(Base):
     owner_key: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     exercise_id: Mapped[str] = mapped_column(String(128), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UserTrainingTemplate(Base):
+    __tablename__ = "user_training_templates"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_user_training_templates_name"),)
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    exercise_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 def database_url_from_path(path: Path) -> str:
@@ -158,13 +170,18 @@ class SqlStore:
                 {"exerciseId": row.exercise_id, "ownerKey": row.owner_key, "createdAt": iso_datetime(row.created_at)}
                 for row in session.scalars(select(FavoriteExercise)).all()
             ],
+            "userTemplates": [
+                {"id": row.id, "userId": row.user_id, "name": row.name, "exerciseIds": list(row.exercise_ids),
+                 "createdAt": iso_datetime(row.created_at), "updatedAt": iso_datetime(row.updated_at)}
+                for row in session.scalars(select(UserTrainingTemplate)).all()
+            ],
         }
 
     @staticmethod
     def _replace(session: Session, data: Dict[str, Any]) -> None:
         # Delete dependent rows first to keep the operation portable across
         # PostgreSQL and the SQLite database used by the test suite.
-        for model in (TrainingSet, WorkoutExercise, FavoriteExercise, UserSession, Workout, User):
+        for model in (TrainingSet, WorkoutExercise, FavoriteExercise, UserTrainingTemplate, UserSession, Workout, User):
             session.execute(delete(model))
         session.flush()
         session.add_all(User(
@@ -193,3 +210,7 @@ class SqlStore:
         session.add_all(FavoriteExercise(
             owner_key=row["ownerKey"], exercise_id=row["exerciseId"], created_at=parse_datetime(row["createdAt"]),
         ) for row in data["favoriteExercises"])
+        session.add_all(UserTrainingTemplate(
+            id=row["id"], user_id=row["userId"], name=row["name"], exercise_ids=row["exerciseIds"],
+            created_at=parse_datetime(row["createdAt"]), updated_at=parse_datetime(row["updatedAt"]),
+        ) for row in data.get("userTemplates", []))

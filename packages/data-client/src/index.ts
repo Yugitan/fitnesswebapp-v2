@@ -6,6 +6,33 @@ export { AUTH_CHANGE_EVENT } from "./auth-storage";
 
 const API_BASE = "/api";
 
+export type TrainingTemplate = {
+  id: string;
+  kind: "built-in" | "custom";
+  name: string;
+  description: string;
+  tag: string;
+  exerciseIds: string[];
+};
+
+export type QuickExercises = {
+  favorites: string[];
+  recent: string[];
+  recommended: Array<{
+    id: string;
+    name: string;
+    exerciseIds: string[];
+  }>;
+};
+
+export type DraftExerciseInput = {
+  exerciseId: string;
+  sets: Array<{
+    weightKg?: number;
+    reps?: number;
+  }>;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -32,6 +59,36 @@ export function getWorkoutBundle(workoutId: string) {
   return request<WorkoutBundle | undefined>(`/workouts/${encodeURIComponent(workoutId)}`);
 }
 
+export function listTrainingTemplates(): Promise<TrainingTemplate[]> {
+  return request("/training/templates");
+}
+
+export function createTrainingTemplate(name: string, exerciseIds: string[]): Promise<TrainingTemplate> {
+  return request("/training/templates", {
+    method: "POST",
+    body: JSON.stringify({ name, exerciseIds }),
+  });
+}
+
+export function deleteTrainingTemplate(templateId: string): Promise<void> {
+  return request(`/training/templates/${encodeURIComponent(templateId)}`, { method: "DELETE" });
+}
+
+export function updateTrainingTemplate(
+  templateId: string,
+  name: string,
+  exerciseIds: string[],
+): Promise<TrainingTemplate> {
+  return request(`/training/templates/${encodeURIComponent(templateId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name, exerciseIds }),
+  });
+}
+
+export function listQuickExercises(): Promise<QuickExercises> {
+  return request("/training/quick-exercises");
+}
+
 export function getWorkoutBundleByDate(date: string) {
   return request<WorkoutBundle | undefined>(`/workouts/by-date/${encodeURIComponent(date)}`);
 }
@@ -48,8 +105,12 @@ export function listMonthWorkoutBundles(month: string) {
   return request<WorkoutBundle[]>(`/workouts?month=${encodeURIComponent(month)}`);
 }
 
+export function listAllWorkoutBundles() {
+  return request<WorkoutBundle[]>("/workouts");
+}
+
 export async function listWorkouts(): Promise<Workout[]> {
-  const bundles = await request<WorkoutBundle[]>("/workouts");
+  const bundles = await listAllWorkoutBundles();
   return bundles.map((bundle) => bundle.workout);
 }
 
@@ -57,6 +118,18 @@ export function getOrCreateWorkout(date: string): Promise<Workout> {
   return request<Workout>("/workouts", {
     method: "POST",
     body: JSON.stringify({ date }),
+  });
+}
+
+export function commitWorkout(
+  date: string,
+  exerciseIds: string[],
+  notes: string,
+  draftExercises: DraftExerciseInput[] = [],
+): Promise<WorkoutBundle> {
+  return request("/workouts/complete", {
+    method: "POST",
+    body: JSON.stringify({ date, exerciseIds, notes, draftExercises }),
   });
 }
 

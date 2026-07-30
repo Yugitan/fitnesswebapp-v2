@@ -66,6 +66,53 @@ def test_guest_workout_and_favorite_flow(tmp_path: Path):
     assert recent[0]["workout"]["date"] == "2026-07-29"
 
 
+def test_workout_is_only_created_when_draft_is_completed(tmp_path: Path):
+    client = TestClient(create_app(tmp_path / "data.json"))
+    date = "2026-07-30"
+
+    # Choosing actions and a template is frontend-only draft state, so the
+    # backend must have no implicit creation route for either operation.
+    assert client.get(f"/api/workouts/by-date/{date}", headers=GUEST_A).json() is None
+    assert client.post("/api/workouts/complete", json={"date": date, "exerciseIds": []}, headers=GUEST_A).status_code == 400
+    assert client.get(f"/api/workouts/by-date/{date}", headers=GUEST_A).json() is None
+
+    completed = client.post(
+        "/api/workouts/complete",
+        json={"date": date, "exerciseIds": ["0662", "0043", "0027"], "notes": "模板草稿完成"},
+        headers=GUEST_A,
+    )
+    assert completed.status_code == 200
+    bundle = completed.json()
+    assert bundle["workout"]["notes"] == "模板草稿完成"
+    assert [item["workoutExercise"]["exerciseId"] for item in bundle["exercises"]] == ["0662", "0043", "0027"]
+    assert all(item["sets"][0]["reps"] == 10 for item in bundle["exercises"])
+
+
+def test_completing_editable_draft_persists_its_sets(tmp_path: Path):
+    client = TestClient(create_app(tmp_path / "data.json"))
+
+    response = client.post(
+        "/api/workouts/complete",
+        json={
+            "date": "2026-07-30",
+            "exerciseIds": ["0662"],
+            "notes": "草稿中填写的训练数据",
+            "draftExercises": [{
+                "exerciseId": "0662",
+                "sets": [
+                    {"weightKg": 40, "reps": 12},
+                    {"weightKg": 45, "reps": 8},
+                ],
+            }],
+        },
+        headers=GUEST_A,
+    )
+
+    assert response.status_code == 200
+    sets = response.json()["exercises"][0]["sets"]
+    assert [(item.get("weightKg"), item.get("reps")) for item in sets] == [(40, 12), (45, 8)]
+
+
 def test_guests_and_users_are_isolated_and_guest_data_migrates(tmp_path: Path):
     client = TestClient(create_app(tmp_path / "data.json"))
     workout = client.post("/api/workouts", json={"date": "2026-07-30"}, headers=GUEST_A).json()
@@ -173,6 +220,66 @@ def test_login_is_rate_limited(tmp_path: Path):
         assert client.post("/api/auth/login", json={"email": "rate@example.com", "password": "incorrect"}).status_code == 401
     blocked = client.post("/api/auth/login", json={"email": "rate@example.com", "password": "password123"})
     assert blocked.status_code == 429
+
+
+def test_templates_and_quick_exercises_require_a_user_and_are_isolated(tmp_path: Path):
+    client = TestClient(create_app(tmp_path / "data.json"))
+    assert client.get("/api/training/templates").status_code == 401
+    assert client.get("/api/training/templates", headers=GUEST_A).status_code == 401
+    assert client.get("/api/training/quick-exercises", headers=GUEST_A).status_code == 401
+
+    first = client.post(
+        "/api/auth/register",
+        json={"email": "templates@example.com", "password": "password123", "confirmPassword": "password123"},
+    ).json()
+    first_headers = bearer(first["token"])
+    templates = client.get("/api/training/templates", headers=first_headers)
+    assert templates.status_code == 200
+    assert [template["id"] for template in templates.json()] == ["beginner-full-body"]
+
+    assert templates.json()[0]["exerciseIds"] == ["0662", "0043", "0027", "0361", "0001"]
+
+    custom = client.post(
+        "/api/training/templates",
+        json={"name": "我的上肢日", "exerciseIds": ["0025", "0027", "0294"]},
+        headers=first_headers,
+    )
+    assert custom.status_code == 201
+    custom_id = custom.json()["id"]
+    assert custom.json()["kind"] == "custom"
+    assert client.get("/api/workouts", headers=first_headers).json() == []
+
+    updated = client.patch(
+        f"/api/training/templates/{custom_id}",
+        json={"name": "我的上肢强化日", "exerciseIds": ["0025", "0294"]},
+        headers=first_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "我的上肢强化日"
+    assert updated.json()["exerciseIds"] == ["0025", "0294"]
+
+    assert client.post(
+        "/api/workouts/complete",
+        json={"date": "2026-07-30", "exerciseIds": ["0025"], "notes": ""},
+        headers=first_headers,
+    ).status_code == 200
+    client.put("/api/favorite-exercises/0025", headers=first_headers)
+    quick = client.get("/api/training/quick-exercises", headers=first_headers).json()
+    assert quick["favorites"] == ["0025"]
+    assert quick["recent"]
+    assert quick["recommended"][0]["id"] == "chest"
+
+    second = client.post(
+        "/api/auth/register",
+        json={"email": "other@example.com", "password": "password123", "confirmPassword": "password123"},
+    ).json()
+    second_headers = bearer(second["token"])
+    assert [template["id"] for template in client.get("/api/training/templates", headers=second_headers).json()] == ["beginner-full-body"]
+    assert client.get("/api/training/quick-exercises", headers=second_headers).json()["favorites"] == []
+    assert client.get("/api/training/quick-exercises", headers=second_headers).json()["recent"] == []
+    assert client.patch(f"/api/training/templates/{custom_id}", json={"name": "无权修改", "exerciseIds": ["0025"]}, headers=second_headers).status_code == 404
+    assert client.delete(f"/api/training/templates/{custom_id}", headers=second_headers).status_code == 404
+    assert client.delete(f"/api/training/templates/{custom_id}", headers=first_headers).status_code == 204
 
 
 def test_health_identifies_fastapi(tmp_path: Path):

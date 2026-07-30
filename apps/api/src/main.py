@@ -20,7 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
 from .database import SqlStore, database_url_from_path
@@ -66,6 +66,23 @@ class WorkoutCreate(BaseModel):
     date: str
 
 
+class DraftSetInput(BaseModel):
+    weightKg: Optional[float] = None
+    reps: Optional[int] = None
+
+
+class DraftExerciseInput(BaseModel):
+    exerciseId: str
+    sets: list[DraftSetInput]
+
+
+class WorkoutCommitInput(BaseModel):
+    date: str
+    exerciseIds: list[str]
+    notes: str = ""
+    draftExercises: list[DraftExerciseInput] = Field(default_factory=list)
+
+
 class ExerciseCreate(BaseModel):
     exerciseId: str
 
@@ -90,12 +107,42 @@ class ChangePasswordInput(BaseModel):
     confirmPassword: str
 
 
+class UserTemplateCreate(BaseModel):
+    name: str
+    exerciseIds: list[str]
+
+
+class UserTemplateUpdate(BaseModel):
+    name: str
+    exerciseIds: list[str]
+
+
 @dataclass(frozen=True)
 class Principal:
     owner_key: str
     kind: str
     user_id: Optional[str] = None
     guest_id: Optional[str] = None
+
+
+BUILT_IN_TRAINING_TEMPLATES = (
+    {
+        "id": "beginner-full-body",
+        "kind": "built-in",
+        "name": "新手全身",
+        "description": "从大肌群开始的全身入门训练",
+        "tag": "全身 · 约 45 分钟",
+        "exerciseIds": ("0662", "0043", "0027", "0361", "0001"),
+    },
+)
+
+BODY_PART_RECOMMENDATIONS = (
+    {"id": "chest", "name": "胸部", "exerciseIds": ("0025", "0662")},
+    {"id": "back", "name": "背部", "exerciseIds": ("0027", "0818")},
+    {"id": "upper-legs", "name": "腿部", "exerciseIds": ("0043", "0054")},
+    {"id": "shoulders", "name": "肩部", "exerciseIds": ("0361", "0334")},
+    {"id": "core", "name": "核心", "exerciseIds": ("0001", "0464")},
+)
 
 
 class LoginAttemptLimiter:
@@ -192,6 +239,85 @@ def bundle_for(data: Dict[str, Any], workout: Optional[Dict[str, Any]]) -> Optio
 
 def owned_workouts(data: Dict[str, Any], principal: Principal):
     return [item for item in data["workouts"] if item.get("ownerKey") == principal.owner_key]
+
+
+def require_user(principal: Principal) -> str:
+    if principal.kind != "user" or not principal.user_id:
+        raise HTTPException(401, "登录后即可使用训练模板和快捷动作")
+    return principal.user_id
+
+
+def recent_exercise_ids(data: Dict[str, Any], principal: Principal, limit: int = 8) -> list[str]:
+    workouts = sorted(owned_workouts(data, principal), key=lambda item: (item["date"], item["updatedAt"]), reverse=True)
+    score_by_id: Dict[str, tuple[int, int]] = {}
+    for workout_index, workout in enumerate(workouts[:24]):
+        for workout_exercise in data["workoutExercises"]:
+            if workout_exercise["workoutId"] != workout["id"]:
+                continue
+            exercise_id = workout_exercise["exerciseId"]
+            count, newest_workout_index = score_by_id.get(exercise_id, (0, workout_index))
+            score_by_id[exercise_id] = (count + 1, min(newest_workout_index, workout_index))
+    return [
+        exercise_id
+        for exercise_id, _ in sorted(score_by_id.items(), key=lambda item: (-item[1][0], item[1][1], item[0]))[:limit]
+    ]
+
+
+def public_user_template(template: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "id": template["id"], "kind": "custom", "name": template["name"],
+        "description": f"{len(template['exerciseIds'])} 个动作 · 你的自定义编排",
+        "tag": "自定义模板", "exerciseIds": template["exerciseIds"],
+    }
+
+
+def find_user_template(data: Dict[str, Any], template_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    return next(
+        (item for item in data["userTemplates"] if item["id"] == template_id and item["userId"] == user_id),
+        None,
+    )
+
+
+def validate_template_exercise_ids(exercise_ids: list[str]) -> list[str]:
+    normalized = []
+    for exercise_id in exercise_ids:
+        if not isinstance(exercise_id, str) or not exercise_id.strip() or len(exercise_id) > 128:
+            raise HTTPException(400, "模板动作格式无效")
+        if exercise_id not in normalized:
+            normalized.append(exercise_id)
+    if not normalized or len(normalized) > 12:
+        raise HTTPException(400, "模板需要包含 1 到 12 个动作")
+    return normalized
+
+
+def validate_workout_exercise_ids(exercise_ids: list[str]) -> list[str]:
+    normalized = []
+    for exercise_id in exercise_ids:
+        if not isinstance(exercise_id, str) or not exercise_id.strip() or len(exercise_id) > 128:
+            raise HTTPException(400, "动作格式无效")
+        if exercise_id not in normalized:
+            normalized.append(exercise_id)
+    if not normalized or len(normalized) > 50:
+        raise HTTPException(400, "一次训练需要包含 1 到 50 个动作")
+    return normalized
+
+
+def validate_draft_exercises(
+    drafts: list[DraftExerciseInput], exercise_ids: list[str],
+) -> Dict[str, list[Dict[str, Any]]]:
+    draft_sets_by_exercise_id: Dict[str, list[Dict[str, Any]]] = {}
+    for draft in drafts:
+        if draft.exerciseId not in exercise_ids or draft.exerciseId in draft_sets_by_exercise_id:
+            raise HTTPException(400, "草稿动作格式无效")
+        if not draft.sets or len(draft.sets) > 50:
+            raise HTTPException(400, "每个草稿动作需要包含 1 到 50 组")
+        sets = []
+        for draft_set in draft.sets:
+            weight_kg = optional_number(draft_set.weightKg, "weightKg")
+            reps = optional_number(draft_set.reps, "reps", integer=True)
+            sets.append({"weightKg": weight_kg, "reps": reps})
+        draft_sets_by_exercise_id[draft.exerciseId] = sets
+    return draft_sets_by_exercise_id
 
 
 def require_workout(data: Dict[str, Any], workout_id: str, principal: Principal) -> Dict[str, Any]:
@@ -377,6 +503,11 @@ def create_app(data_file: Optional[Path] = None, *, database_url: Optional[str] 
         store.mutate(lambda current: claim_legacy_data(current, principal.owner_key))
         return principal
 
+    def get_user_principal(authorization: Optional[str] = Header(None)) -> Principal:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(401, "请先登录")
+        return get_principal(authorization=authorization, x_guest_id=None)
+
     def create_session(data: Dict[str, Any], user: Dict[str, Any]) -> Dict[str, Any]:
         token = secrets.token_urlsafe(32)
         timestamp = now_datetime()
@@ -453,6 +584,100 @@ def create_app(data_file: Optional[Path] = None, *, database_url: Optional[str] 
             hashed = token_hash(authorization.removeprefix("Bearer ").strip())
             store.mutate(lambda data: data.update(sessions=[item for item in data["sessions"] if item["tokenHash"] != hashed]))
         return Response(status_code=204)
+
+    @app.get("/api/training/templates")
+    def list_training_templates(principal: Principal = Depends(get_user_principal)):
+        user_id = require_user(principal)
+        data = store.read()
+        custom_templates = [
+            public_user_template(template)
+            for template in sorted(
+                (item for item in data["userTemplates"] if item["userId"] == user_id),
+                key=lambda item: item["updatedAt"],
+                reverse=True,
+            )
+        ]
+        return [dict(template) for template in BUILT_IN_TRAINING_TEMPLATES] + custom_templates
+
+    @app.post("/api/training/templates", status_code=201)
+    def create_user_training_template(
+        payload: UserTemplateCreate,
+        principal: Principal = Depends(get_user_principal),
+    ):
+        user_id = require_user(principal)
+        name = payload.name.strip()
+        if not name or len(name) > 60:
+            raise HTTPException(400, "模板名称长度应为 1 到 60 位")
+        exercise_ids = validate_template_exercise_ids(payload.exerciseIds)
+
+        def mutation(data: Dict[str, Any]):
+            if any(item["userId"] == user_id and item["name"].casefold() == name.casefold() for item in data["userTemplates"]):
+                raise HTTPException(409, "已有同名自定义模板")
+            template = {
+                "id": create_id("template"), "userId": user_id, "name": name,
+                "exerciseIds": exercise_ids, "createdAt": now(), "updatedAt": now(),
+            }
+            data["userTemplates"].append(template)
+            return public_user_template(template)
+
+        return store.mutate(mutation)
+
+    @app.delete("/api/training/templates/{template_id}", status_code=204)
+    def delete_user_training_template(template_id: str, principal: Principal = Depends(get_user_principal)):
+        user_id = require_user(principal)
+
+        def mutation(data: Dict[str, Any]):
+            template = find_user_template(data, template_id, user_id)
+            if template is None:
+                raise HTTPException(404, "自定义模板不存在")
+            data["userTemplates"] = [item for item in data["userTemplates"] if item["id"] != template_id]
+
+        store.mutate(mutation)
+        return Response(status_code=204)
+
+    @app.patch("/api/training/templates/{template_id}")
+    def update_user_training_template(
+        template_id: str,
+        payload: UserTemplateUpdate,
+        principal: Principal = Depends(get_user_principal),
+    ):
+        user_id = require_user(principal)
+        name = payload.name.strip()
+        if not name or len(name) > 60:
+            raise HTTPException(400, "模板名称长度应为 1 到 60 位")
+        exercise_ids = validate_template_exercise_ids(payload.exerciseIds)
+
+        def mutation(data: Dict[str, Any]):
+            template = find_user_template(data, template_id, user_id)
+            if template is None:
+                raise HTTPException(404, "自定义模板不存在")
+            if any(
+                item["id"] != template_id and item["userId"] == user_id and item["name"].casefold() == name.casefold()
+                for item in data["userTemplates"]
+            ):
+                raise HTTPException(409, "已有同名自定义模板")
+            template.update(name=name, exerciseIds=exercise_ids, updatedAt=now())
+            return public_user_template(template)
+
+        return store.mutate(mutation)
+
+    @app.get("/api/training/quick-exercises")
+    def list_quick_exercises(principal: Principal = Depends(get_user_principal)):
+        require_user(principal)
+        data = store.read()
+        favorites = [
+            item["exerciseId"]
+            for item in sorted(
+                (item for item in data["favoriteExercises"] if item.get("ownerKey") == principal.owner_key),
+                key=lambda item: item.get("createdAt", ""),
+                reverse=True,
+            )
+        ]
+        return {
+            "favorites": favorites[:8],
+            "recent": recent_exercise_ids(data, principal),
+            "recommended": [dict(item) for item in BODY_PART_RECOMMENDATIONS],
+        }
 
     @app.patch("/api/auth/password", status_code=204)
     def change_password(
@@ -531,6 +756,55 @@ def create_app(data_file: Optional[Path] = None, *, database_url: Optional[str] 
             }
             data["workouts"].append(workout)
             return {key: value for key, value in workout.items() if key != "ownerKey"}
+
+        return store.mutate(mutation)
+
+    @app.post("/api/workouts/complete")
+    def commit_workout(payload: WorkoutCommitInput, principal: Principal = Depends(get_principal)):
+        if not DATE_PATTERN.fullmatch(payload.date):
+            raise HTTPException(400, "date 必须是 YYYY-MM-DD")
+        if not isinstance(payload.notes, str) or len(payload.notes) > 2000:
+            raise HTTPException(400, "备注格式无效")
+        exercise_ids = validate_workout_exercise_ids(payload.exerciseIds)
+        draft_sets_by_exercise_id = validate_draft_exercises(payload.draftExercises, exercise_ids)
+
+        def mutation(data: Dict[str, Any]):
+            workout = next((item for item in owned_workouts(data, principal) if item["date"] == payload.date), None)
+            if workout is None:
+                timestamp = now()
+                workout = {
+                    "id": create_id("workout"), "ownerKey": principal.owner_key, "date": payload.date,
+                    "notes": payload.notes.strip(), "createdAt": timestamp, "updatedAt": timestamp,
+                }
+                data["workouts"].append(workout)
+            else:
+                workout["notes"] = payload.notes.strip()
+                workout["updatedAt"] = now()
+            existing_workout_exercises = [item for item in data["workoutExercises"] if item["workoutId"] == workout["id"]]
+            existing_ids = {item["exerciseId"] for item in existing_workout_exercises}
+            sort_order = max((item["sortOrder"] for item in existing_workout_exercises), default=-1) + 1
+            for exercise_id in exercise_ids:
+                if exercise_id in existing_ids:
+                    continue
+                workout_exercise = {
+                    "id": create_id("workoutExercise"), "workoutId": workout["id"],
+                    "exerciseId": exercise_id, "sortOrder": sort_order,
+                }
+                data["workoutExercises"].append(workout_exercise)
+                draft_sets = draft_sets_by_exercise_id.get(exercise_id, [{"weightKg": None, "reps": 10}])
+                for set_number, draft_set in enumerate(draft_sets, start=1):
+                    training_set = {
+                        "id": create_id("set"), "workoutExerciseId": workout_exercise["id"],
+                        "setNumber": set_number, "createdAt": now(),
+                    }
+                    if draft_set["weightKg"] is not None:
+                        training_set["weightKg"] = draft_set["weightKg"]
+                    if draft_set["reps"] is not None:
+                        training_set["reps"] = draft_set["reps"]
+                    data["trainingSets"].append(training_set)
+                existing_ids.add(exercise_id)
+                sort_order += 1
+            return bundle_for(data, workout)
 
         return store.mutate(mutation)
 

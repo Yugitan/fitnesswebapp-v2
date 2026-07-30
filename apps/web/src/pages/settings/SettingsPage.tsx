@@ -3,6 +3,7 @@ import {
   clearAllData,
   exportAllData,
   importAllData,
+  listAllWorkoutBundles,
   listWorkouts,
   logoutUser,
   seedMayJuneTestWorkouts,
@@ -26,9 +27,12 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { navigateBack } from "../../app/router";
 import { useAuth } from "../../shared/hooks/use-auth";
 import { openAuthDialog } from "../../shared/lib/auth-dialog";
+import { useExercises } from "../../shared/hooks/use-exercises";
+import { createWorkoutCsv, createWorkoutXlsx, downloadFile } from "../../shared/lib/workout-export";
 
 export function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
+  const { byId: exercisesById } = useExercises();
   const [workoutCount, setWorkoutCount] = useState(0);
   const [message, setMessage] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
@@ -62,6 +66,24 @@ export function SettingsPage() {
     anchor.click();
     URL.revokeObjectURL(url);
     setMessage("数据已导出");
+  }
+
+  async function handleTableExport(format: "csv" | "xlsx") {
+    const bundles = await listAllWorkoutBundles();
+    const date = new Date().toISOString().slice(0, 10);
+
+    if (format === "csv") {
+      downloadFile(createWorkoutCsv(bundles, exercisesById), `xiaobai-amax-training-${date}.csv`, "text/csv;charset=utf-8");
+      setMessage(`已导出 ${bundles.length} 条训练记录（CSV）`);
+      return;
+    }
+
+    downloadFile(
+      createWorkoutXlsx(bundles, exercisesById),
+      `xiaobai-amax-training-${date}.xlsx`,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    setMessage(`已导出 ${bundles.length} 条训练记录（Excel）`);
   }
 
   async function handleImport(file?: File) {
@@ -202,6 +224,16 @@ export function SettingsPage() {
         <button className="settings-row" onClick={handleExport} type="button">
           <span className="settings-row-icon"><Download size={19} /></span>
           <span className="settings-row-copy"><strong>导出数据备份</strong><small>下载 JSON 文件</small></span>
+          <ChevronRight className="settings-row-chevron" size={18} />
+        </button>
+        <button className="settings-row" onClick={() => handleTableExport("csv")} type="button">
+          <span className="settings-row-icon"><Download size={19} /></span>
+          <span className="settings-row-copy"><strong>导出训练明细 CSV</strong><small>可用 Excel、Numbers 等表格软件打开</small></span>
+          <ChevronRight className="settings-row-chevron" size={18} />
+        </button>
+        <button className="settings-row" onClick={() => handleTableExport("xlsx")} type="button">
+          <span className="settings-row-icon"><Download size={19} /></span>
+          <span className="settings-row-copy"><strong>导出训练明细 Excel</strong><small>下载 .xlsx 文件</small></span>
           <ChevronRight className="settings-row-chevron" size={18} />
         </button>
         <button className="settings-row" onClick={() => fileInputRef.current?.click()} type="button">

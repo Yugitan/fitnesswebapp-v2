@@ -2,11 +2,18 @@
   "name": "小白Amax",
   "short_name": "小白Amax",
   "description": "动作展示库和本地训练记录",
-  "start_url": "/Amax",
-  "scope": "/Amax/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#FAFAF8",
   "theme_color": "#FF6B35",
   "lang": "zh-CN",
-  "icons": []
+  "icons": [
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
