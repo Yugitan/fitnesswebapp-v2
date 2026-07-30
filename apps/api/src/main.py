@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import json
 import math
 import os
 import re
@@ -13,33 +12,28 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
+
+from .database import SqlStore, database_url_from_path
 
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MONTH_PATTERN = re.compile(r"^\d{4}-\d{2}$")
 EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 GUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{12,100}$")
-DEFAULT_DATA_FILE = Path(__file__).resolve().parents[3] / "data/runtime/api-data.json"
+DEFAULT_DATABASE_URL = "postgresql+psycopg://amax:amax@127.0.0.1:5432/amax"
 PASSWORD_ITERATIONS = 310_000
 SESSION_DAYS = 30
-
-
-def empty_data() -> Dict[str, Any]:
-    return {
-        "version": 1,
-        "workouts": [],
-        "workoutExercises": [],
-        "trainingSets": [],
-        "favoriteExercises": [],
-        "users": [],
-        "sessions": [],
-    }
+LOGIN_MAX_ATTEMPTS = max(1, int(os.getenv("LOGIN_MAX_ATTEMPTS", "5")))
+LOGIN_WINDOW_SECONDS = max(1, int(os.getenv("LOGIN_WINDOW_SECONDS", "900")))
 
 
 def now_datetime() -> datetime:
@@ -58,20 +52,6 @@ def create_id(prefix: str) -> str:
     return f"{prefix}_{uuid4()}"
 
 
-def normalize_store(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict) or payload.get("version") != 1:
-        raise HTTPException(400, "数据文件版本无效")
-    normalized = empty_data()
-    for key in normalized:
-        if key == "version":
-            continue
-        value = payload.get(key, [])
-        if not isinstance(value, list):
-            raise HTTPException(400, f"数据文件缺少 {key}")
-        normalized[key] = deepcopy(value)
-    return normalized
-
-
 def validate_backup(payload: Any) -> Dict[str, Any]:
     if not isinstance(payload, dict) or payload.get("version") != 1:
         raise HTTPException(400, "备份文件版本无效")
@@ -80,31 +60,6 @@ def validate_backup(payload: Any) -> Dict[str, Any]:
         if not isinstance(payload.get(key), list):
             raise HTTPException(400, f"备份缺少 {key}")
     return {"version": 1, **{key: deepcopy(payload[key]) for key in keys}}
-
-
-class JsonStore:
-    def __init__(self, data_file: Path):
-        self.data_file = data_file
-        self.lock = threading.RLock()
-
-    def read(self) -> Dict[str, Any]:
-        with self.lock:
-            if not self.data_file.exists():
-                return empty_data()
-            return normalize_store(json.loads(self.data_file.read_text(encoding="utf-8")))
-
-    def mutate(self, callback: Callable[[Dict[str, Any]], Any]) -> Any:
-        with self.lock:
-            data = self.read()
-            result = callback(data)
-            self.data_file.parent.mkdir(parents=True, exist_ok=True)
-            temporary_file = self.data_file.with_suffix(f"{self.data_file.suffix}.tmp")
-            temporary_file.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            os.replace(temporary_file, self.data_file)
-            return result
 
 
 class WorkoutCreate(BaseModel):
@@ -118,6 +73,7 @@ class ExerciseCreate(BaseModel):
 class RegisterInput(BaseModel):
     email: str
     password: str
+    confirmPassword: Optional[str] = None
     displayName: Optional[str] = None
     guestId: Optional[str] = None
 
@@ -128,12 +84,52 @@ class LoginInput(BaseModel):
     guestId: Optional[str] = None
 
 
+class ChangePasswordInput(BaseModel):
+    currentPassword: str
+    newPassword: str
+    confirmPassword: str
+
+
 @dataclass(frozen=True)
 class Principal:
     owner_key: str
     kind: str
     user_id: Optional[str] = None
     guest_id: Optional[str] = None
+
+
+class LoginAttemptLimiter:
+    """Small per-process login throttle.
+
+    Production deployments should keep a single API worker or replace this
+    with a shared Redis limiter before horizontally scaling the API.
+    """
+
+    def __init__(self, maximum_attempts: int, window_seconds: int):
+        self.maximum_attempts = maximum_attempts
+        self.window = timedelta(seconds=window_seconds)
+        self.attempts: Dict[str, list[datetime]] = {}
+        self.lock = threading.Lock()
+
+    def check(self, key: str) -> None:
+        timestamp = now_datetime()
+        with self.lock:
+            recent = [attempt for attempt in self.attempts.get(key, []) if timestamp - attempt < self.window]
+            self.attempts[key] = recent
+            if len(recent) >= self.maximum_attempts:
+                remaining = max(1, math.ceil((self.window - (timestamp - recent[0])).total_seconds()))
+                raise HTTPException(429, f"登录尝试过多，请在 {remaining} 秒后重试")
+
+    def record_failure(self, key: str) -> None:
+        timestamp = now_datetime()
+        with self.lock:
+            recent = [attempt for attempt in self.attempts.get(key, []) if timestamp - attempt < self.window]
+            recent.append(timestamp)
+            self.attempts[key] = recent
+
+    def reset(self, key: str) -> None:
+        with self.lock:
+            self.attempts.pop(key, None)
 
 
 def hash_password(password: str) -> str:
@@ -333,9 +329,19 @@ def seed_data(data: Dict[str, Any], principal: Principal) -> int:
     return len(SEED_WORKOUTS)
 
 
-def create_app(data_file: Optional[Path] = None) -> FastAPI:
-    store = JsonStore(data_file or DEFAULT_DATA_FILE)
-    app = FastAPI(title="小白 Amax API", version="0.2.0")
+def create_app(data_file: Optional[Path] = None, *, database_url: Optional[str] = None) -> FastAPI:
+    # ``data_file`` remains a test-only compatibility parameter.  Runtime
+    # deployments use DATABASE_URL and are expected to run Alembic migrations.
+    if data_file is not None:
+        store = SqlStore(database_url_from_path(data_file), initialize_schema=True)
+    else:
+        store = SqlStore(database_url or os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL))
+    app = FastAPI(title="小白 Amax API", version="0.3.0")
+    allowed_hosts = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or ["*"])
+    if os.getenv("FORCE_HTTPS", "false").lower() in {"1", "true", "yes"}:
+        app.add_middleware(HTTPSRedirectMiddleware)
+    login_limiter = LoginAttemptLimiter(LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS)
 
     @app.exception_handler(HTTPException)
     async def http_error_handler(_, exc: HTTPException):
@@ -344,6 +350,10 @@ def create_app(data_file: Optional[Path] = None) -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(_, exc: RequestValidationError):
         return JSONResponse(status_code=422, content={"error": "请求参数格式无效", "details": exc.errors()})
+
+    @app.exception_handler(SQLAlchemyError)
+    async def database_error_handler(_, __: SQLAlchemyError):
+        return JSONResponse(status_code=503, content={"error": "服务暂时不可用，请稍后重试"})
 
     def get_principal(
         authorization: Optional[str] = Header(None),
@@ -389,6 +399,10 @@ def create_app(data_file: Optional[Path] = None) -> FastAPI:
             raise HTTPException(400, "邮箱格式无效")
         if len(payload.password) < 8:
             raise HTTPException(400, "密码至少需要 8 位")
+        if payload.confirmPassword is None:
+            raise HTTPException(400, "请再次输入密码")
+        if not hmac.compare_digest(payload.password, payload.confirmPassword):
+            raise HTTPException(400, "两次输入的密码不一致")
         if not display_name or len(display_name) > 40:
             raise HTTPException(400, "昵称长度应为 1 到 40 位")
 
@@ -406,17 +420,23 @@ def create_app(data_file: Optional[Path] = None) -> FastAPI:
         return store.mutate(mutation)
 
     @app.post("/api/auth/login")
-    def login(payload: LoginInput):
+    def login(payload: LoginInput, request: Request):
         email = payload.email.strip().lower()
+        client_host = request.client.host if request.client else "unknown"
+        limiter_key = f"{client_host}:{email}"
+        login_limiter.check(limiter_key)
 
         def mutation(data: Dict[str, Any]):
             user = next((item for item in data["users"] if item["email"].lower() == email), None)
             if user is None or not verify_password(payload.password, user["passwordHash"]):
+                login_limiter.record_failure(limiter_key)
                 raise HTTPException(401, "邮箱或密码错误")
             migrate_guest_data(data, payload.guestId, user["id"])
             return create_session(data, user)
 
-        return store.mutate(mutation)
+        result = store.mutate(mutation)
+        login_limiter.reset(limiter_key)
+        return result
 
     @app.get("/api/auth/me")
     def me(principal: Principal = Depends(get_principal)):
@@ -432,6 +452,36 @@ def create_app(data_file: Optional[Path] = None) -> FastAPI:
         if authorization and authorization.startswith("Bearer "):
             hashed = token_hash(authorization.removeprefix("Bearer ").strip())
             store.mutate(lambda data: data.update(sessions=[item for item in data["sessions"] if item["tokenHash"] != hashed]))
+        return Response(status_code=204)
+
+    @app.patch("/api/auth/password", status_code=204)
+    def change_password(
+        payload: ChangePasswordInput,
+        principal: Principal = Depends(get_principal),
+        authorization: Optional[str] = Header(None),
+    ):
+        if principal.kind != "user" or not principal.user_id:
+            raise HTTPException(401, "请先登录")
+        if len(payload.newPassword) < 8:
+            raise HTTPException(400, "新密码至少需要 8 位")
+        if not hmac.compare_digest(payload.newPassword, payload.confirmPassword):
+            raise HTTPException(400, "两次输入的新密码不一致")
+        current_token_hash = token_hash(authorization.removeprefix("Bearer ").strip()) if authorization and authorization.startswith("Bearer ") else ""
+
+        def mutation(data: Dict[str, Any]):
+            user = next((item for item in data["users"] if item["id"] == principal.user_id), None)
+            if user is None:
+                raise HTTPException(401, "用户不存在")
+            if not verify_password(payload.currentPassword, user["passwordHash"]):
+                raise HTTPException(400, "当前密码不正确")
+            user["passwordHash"] = hash_password(payload.newPassword)
+            # Keep this device signed in and revoke every other active session.
+            data["sessions"] = [
+                item for item in data["sessions"]
+                if item["userId"] != user["id"] or hmac.compare_digest(item["tokenHash"], current_token_hash)
+            ]
+
+        store.mutate(mutation)
         return Response(status_code=204)
 
     @app.get("/api/workouts/today")

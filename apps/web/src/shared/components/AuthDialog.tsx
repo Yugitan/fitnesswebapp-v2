@@ -3,7 +3,7 @@ import {
   registerUser,
   type AuthUser,
 } from "@xiaobai-amax/data-client";
-import { ArrowRight, Check, Dumbbell, X } from "lucide-react";
+import { ArrowRight, Check, Dumbbell, Eye, EyeOff, X } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
 
 type AuthDialogProps = {
@@ -19,6 +19,9 @@ export function AuthDialog({ open, onClose, onSuccess }: AuthDialogProps) {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,12 +33,16 @@ export function AuthDialog({ open, onClose, onSuccess }: AuthDialogProps) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (mode === "register" && password !== confirmPassword) {
+      setError("两次输入的密码不一致");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
       const user = mode === "login"
         ? await loginUser({ email, password })
-        : await registerUser({ displayName, email, password });
+        : await registerUser({ displayName, email, password, confirmPassword });
       onSuccess(user);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "提交失败，请稍后重试");
@@ -83,8 +90,24 @@ export function AuthDialog({ open, onClose, onSuccess }: AuthDialogProps) {
             </label>
             <label>
               <span>密码</span>
-              <input autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} onChange={(event) => setPassword(event.target.value)} placeholder="至少 8 位" required type="password" value={password} />
+              <span className="auth-password-field">
+                <input autoComplete={mode === "login" ? "current-password" : "new-password"} minLength={8} onChange={(event) => setPassword(event.target.value)} placeholder="至少 8 位" required type={showPassword ? "text" : "password"} value={password} />
+                <button aria-label={showPassword ? "隐藏密码" : "显示密码"} className="auth-password-toggle" onClick={() => setShowPassword((visible) => !visible)} type="button">
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </span>
             </label>
+            {mode === "register" ? (
+              <label>
+                <span>确认密码</span>
+                <span className="auth-password-field">
+                  <input autoComplete="new-password" minLength={8} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="再次输入密码" required type={showConfirmPassword ? "text" : "password"} value={confirmPassword} />
+                  <button aria-label={showConfirmPassword ? "隐藏确认密码" : "显示确认密码"} className="auth-password-toggle" onClick={() => setShowConfirmPassword((visible) => !visible)} type="button">
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </span>
+              </label>
+            ) : null}
             {error ? <p className="auth-error">{error}</p> : null}
             <button className="auth-submit" disabled={submitting} type="submit">
               <span>{submitting ? "处理中..." : mode === "login" ? "登录并同步" : "注册并同步"}</span>

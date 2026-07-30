@@ -1,4 +1,5 @@
 import {
+  changePassword,
   clearAllData,
   exportAllData,
   importAllData,
@@ -12,6 +13,8 @@ import {
   ChevronRight,
   Database,
   Download,
+  Eye,
+  EyeOff,
   HardDrive,
   Info,
   LogOut,
@@ -19,7 +22,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { navigateBack } from "../../app/router";
 import { useAuth } from "../../shared/hooks/use-auth";
 import { openAuthDialog } from "../../shared/lib/auth-dialog";
@@ -29,6 +32,15 @@ export function SettingsPage() {
   const [workoutCount, setWorkoutCount] = useState(0);
   const [message, setMessage] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function refresh() {
@@ -70,6 +82,33 @@ export function SettingsPage() {
     const count = await seedMayJuneTestWorkouts();
     await refresh();
     setMessage(`已生成 ${count} 条 5、6 月测试训练记录`);
+  }
+
+  function closeChangePassword() {
+    setChangePasswordOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordError("");
+  }
+
+  async function handleChangePassword(event: FormEvent) {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPasswordError("两次输入的新密码不一致");
+      return;
+    }
+    setChangingPassword(true);
+    setPasswordError("");
+    try {
+      await changePassword({ currentPassword, newPassword, confirmPassword });
+      closeChangePassword();
+      setMessage("密码已更新，其他设备已退出登录");
+    } catch (changeError) {
+      setPasswordError(changeError instanceof Error ? changeError.message : "修改失败，请稍后重试");
+    } finally {
+      setChangingPassword(false);
+    }
   }
 
   return (
@@ -130,6 +169,21 @@ export function SettingsPage() {
         </div>
         <p>{user ? "账号空间" : "游客空间"}<br />PRIVATE DATA</p>
       </section>
+
+      {user ? (
+        <section className="settings-section">
+          <div className="settings-section-title">
+            <div><span>ACCOUNT SECURITY</span><h2>账号安全</h2></div>
+          </div>
+          <div className="settings-menu">
+            <button className="settings-row" onClick={() => setChangePasswordOpen(true)} type="button">
+              <span className="settings-row-icon"><ShieldCheck size={19} /></span>
+              <span className="settings-row-copy"><strong>修改密码</strong><small>修改后，其他设备将退出登录</small></span>
+              <ChevronRight className="settings-row-chevron" size={18} />
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="settings-section">
         <div className="settings-section-title">
@@ -197,6 +251,42 @@ export function SettingsPage() {
             <button className="btn btn-ghost full-width" onClick={() => setConfirmClear(false)} type="button">
               取消
             </button>
+          </section>
+        </div>
+      ) : null}
+
+      {changePasswordOpen ? (
+        <div className="confirm-backdrop" onClick={closeChangePassword}>
+          <section aria-modal="true" className="change-password-sheet" onClick={(event) => event.stopPropagation()} role="dialog">
+            <div className="confirm-icon"><ShieldCheck size={20} /></div>
+            <h2>修改密码</h2>
+            <p>为保障账号安全，请先验证当前密码。保存后，其他设备将退出登录。</p>
+            <form className="change-password-form" onSubmit={handleChangePassword}>
+              <label>
+                <span>当前密码</span>
+                <span className="auth-password-field">
+                  <input autoComplete="current-password" onChange={(event) => setCurrentPassword(event.target.value)} required type={showCurrentPassword ? "text" : "password"} value={currentPassword} />
+                  <button aria-label={showCurrentPassword ? "隐藏当前密码" : "显示当前密码"} className="auth-password-toggle" onClick={() => setShowCurrentPassword((visible) => !visible)} type="button">{showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </span>
+              </label>
+              <label>
+                <span>新密码</span>
+                <span className="auth-password-field">
+                  <input autoComplete="new-password" minLength={8} onChange={(event) => setNewPassword(event.target.value)} placeholder="至少 8 位" required type={showNewPassword ? "text" : "password"} value={newPassword} />
+                  <button aria-label={showNewPassword ? "隐藏新密码" : "显示新密码"} className="auth-password-toggle" onClick={() => setShowNewPassword((visible) => !visible)} type="button">{showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </span>
+              </label>
+              <label>
+                <span>确认新密码</span>
+                <span className="auth-password-field">
+                  <input autoComplete="new-password" minLength={8} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="再次输入新密码" required type={showConfirmPassword ? "text" : "password"} value={confirmPassword} />
+                  <button aria-label={showConfirmPassword ? "隐藏确认新密码" : "显示确认新密码"} className="auth-password-toggle" onClick={() => setShowConfirmPassword((visible) => !visible)} type="button">{showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                </span>
+              </label>
+              {passwordError ? <p className="auth-error">{passwordError}</p> : null}
+              <button className="btn btn-primary full-width" disabled={changingPassword} type="submit">{changingPassword ? "正在保存..." : "保存新密码"}</button>
+              <button className="btn btn-ghost full-width" onClick={closeChangePassword} type="button">取消</button>
+            </form>
           </section>
         </div>
       ) : null}

@@ -22,6 +22,13 @@ export type AuthCredentials = {
 
 export type RegisterCredentials = AuthCredentials & {
   displayName: string;
+  confirmPassword: string;
+};
+
+export type ChangePasswordCredentials = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
 };
 
 type AuthResponse = {
@@ -81,4 +88,11 @@ export async function logoutUser(): Promise<void> {
   } finally {
     clearAuthToken();
   }
+}
+
+export function changePassword(credentials: ChangePasswordCredentials): Promise<void> {
+  return authRequest("/auth/password", {
+    method: "PATCH",
+    body: JSON.stringify(credentials),
+  });
 }

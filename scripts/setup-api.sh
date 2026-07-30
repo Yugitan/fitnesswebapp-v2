@@ -8,5 +8,6 @@ python_bin="$api_root/.venv/bin/python"
 if [ ! -x "$python_bin" ]; then
   python3 -m venv "$api_root/.venv"
   "$python_bin" -m pip install --upgrade pip
-  "$python_bin" -m pip install -r "$api_root/requirements.txt"
 fi
+
+"$python_bin" -m pip install -r "$api_root/requirements.txt"

@@ -85,6 +85,7 @@ def test_guests_and_users_are_isolated_and_guest_data_migrates(tmp_path: Path):
         json={
             "email": "first@example.com",
             "password": "password123",
+            "confirmPassword": "password123",
             "displayName": "第一位用户",
             "guestId": GUEST_A["X-Guest-ID"],
         },
@@ -99,7 +100,7 @@ def test_guests_and_users_are_isolated_and_guest_data_migrates(tmp_path: Path):
 
     second = client.post(
         "/api/auth/register",
-        json={"email": "second@example.com", "password": "password456", "displayName": "第二位用户"},
+        json={"email": "second@example.com", "password": "password456", "confirmPassword": "password456", "displayName": "第二位用户"},
     ).json()
     second_headers = {"Authorization": f"Bearer {second['token']}", **GUEST_B}
     assert client.get("/api/workouts", headers=second_headers).json() == []
@@ -117,17 +118,61 @@ def test_registration_validation_and_logout(tmp_path: Path):
     client = TestClient(create_app(tmp_path / "data.json"))
     weak = client.post(
         "/api/auth/register",
-        json={"email": "bad@example.com", "password": "short", "displayName": "测试"},
+        json={"email": "bad@example.com", "password": "short", "confirmPassword": "short", "displayName": "测试"},
     )
     assert weak.status_code == 400
 
+    mismatch = client.post(
+        "/api/auth/register",
+        json={"email": "mismatch@example.com", "password": "password123", "confirmPassword": "password456", "displayName": "测试"},
+    )
+    assert mismatch.status_code == 400
+    assert mismatch.json() == {"error": "两次输入的密码不一致"}
+
     registered = client.post(
         "/api/auth/register",
-        json={"email": "valid@example.com", "password": "password123", "displayName": "测试"},
+        json={"email": "valid@example.com", "password": "password123", "confirmPassword": "password123", "displayName": "测试"},
     ).json()
     headers = bearer(registered["token"])
     assert client.post("/api/auth/logout", headers=headers).status_code == 204
     assert client.get("/api/auth/me", headers=headers).status_code == 401
+
+
+def test_password_change_revokes_other_sessions(tmp_path: Path):
+    client = TestClient(create_app(tmp_path / "data.json"))
+    registered = client.post(
+        "/api/auth/register",
+        json={"email": "password@example.com", "password": "password123", "confirmPassword": "password123"},
+    ).json()
+    first_headers = bearer(registered["token"])
+    second = client.post(
+        "/api/auth/login",
+        json={"email": "password@example.com", "password": "password123"},
+    ).json()
+    second_headers = bearer(second["token"])
+
+    changed = client.patch(
+        "/api/auth/password",
+        json={"currentPassword": "password123", "newPassword": "newpassword123", "confirmPassword": "newpassword123"},
+        headers=first_headers,
+    )
+    assert changed.status_code == 204
+    assert client.get("/api/auth/me", headers=first_headers).status_code == 200
+    assert client.get("/api/auth/me", headers=second_headers).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "password@example.com", "password": "password123"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "password@example.com", "password": "newpassword123"}).status_code == 200
+
+
+def test_login_is_rate_limited(tmp_path: Path):
+    client = TestClient(create_app(tmp_path / "data.json"))
+    client.post(
+        "/api/auth/register",
+        json={"email": "rate@example.com", "password": "password123", "confirmPassword": "password123"},
+    )
+    for _ in range(5):
+        assert client.post("/api/auth/login", json={"email": "rate@example.com", "password": "incorrect"}).status_code == 401
+    blocked = client.post("/api/auth/login", json={"email": "rate@example.com", "password": "password123"})
+    assert blocked.status_code == 429
 
 
 def test_health_identifies_fastapi(tmp_path: Path):

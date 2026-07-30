@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: amax
+      POSTGRES_USER: amax
+      POSTGRES_PASSWORD: amax
+    ports:
+      - "5432:5432"
+    volumes:
+      - amax-postgres:/var/lib/postgresql/data
+
+volumes:
+  amax-postgres:
