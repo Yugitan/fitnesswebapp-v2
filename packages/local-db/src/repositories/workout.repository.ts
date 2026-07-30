@@ -1,9 +1,10 @@
 import type { TrainingSet, Workout, WorkoutBundle, WorkoutExercise } from "@xiaobai-amax/domain";
+import { createUuid } from "@xiaobai-amax/utils";
 import { idbRequest, openAppDb, transactionDone } from "../db";
 import { STORES } from "../schema";
 
 export function createId(prefix: string): string {
-  return `${prefix}_${crypto.randomUUID()}`;
+  return `${prefix}_${createUuid()}`;
 }
 
 export function todayDate(): string {

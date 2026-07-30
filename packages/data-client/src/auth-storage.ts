@@ -1,3 +1,5 @@
+import { createUuid } from "@xiaobai-amax/utils";
+
 const AUTH_TOKEN_KEY = "xiaobai-amax.auth-token";
 const GUEST_ID_KEY = "xiaobai-amax.guest-id";
 export const AUTH_CHANGE_EVENT = "xiaobai-amax:auth-change";
@@ -5,7 +7,7 @@ export const AUTH_CHANGE_EVENT = "xiaobai-amax:auth-change";
 export function getGuestId(): string {
   let guestId = localStorage.getItem(GUEST_ID_KEY);
   if (!guestId) {
-    guestId = `guest_${crypto.randomUUID().replaceAll("-", "")}`;
+    guestId = `guest_${createUuid().replace(/-/g, "")}`;
     localStorage.setItem(GUEST_ID_KEY, guestId);
   }
   return guestId;

@@ -101,7 +101,7 @@ function OfflineNotice() {
 
 export function App() {
   const route = useAppRoute();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refresh: refreshAuth } = useAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const isExerciseDetail = route.parts[0] === "exercises" && Boolean(route.parts[1]);
   const isWorkoutDetail =
@@ -165,7 +165,11 @@ export function App() {
       </div>
       <AuthDialog
         onClose={closeAuthDialog}
-        onSuccess={() => window.location.reload()}
+        onSuccess={async () => {
+          dismissAuthPrompt();
+          setAuthOpen(false);
+          await refreshAuth();
+        }}
         open={authOpen}
       />
     </div>

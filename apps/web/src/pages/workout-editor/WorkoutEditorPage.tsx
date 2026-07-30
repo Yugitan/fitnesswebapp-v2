@@ -13,7 +13,7 @@ import {
   updateSet,
   type DraftExerciseInput,
 } from "@xiaobai-amax/data-client";
-import { formatVolume } from "@xiaobai-amax/utils";
+import { createUuid, formatVolume } from "@xiaobai-amax/utils";
 import { ArrowLeft, BookmarkPlus, LockKeyhole, Plus, Search, Sparkles, Trash2, X } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { navigate, navigateBack } from "../../app/router";
@@ -41,11 +41,11 @@ type DraftSet = {
 };
 
 function createDraftSet(previous?: DraftSet): DraftSet {
-  return { id: `draft_set_${crypto.randomUUID()}`, weightKg: previous?.weightKg, reps: previous?.reps ?? 10 };
+  return { id: `draft_set_${createUuid()}`, weightKg: previous?.weightKg, reps: previous?.reps ?? 10 };
 }
 
 function createDraftExercise(exerciseId: string, source: DraftExercise["source"]): DraftExercise {
-  return { id: `draft_${crypto.randomUUID()}`, exerciseId, source, sets: [createDraftSet()] };
+  return { id: `draft_${createUuid()}`, exerciseId, source, sets: [createDraftSet()] };
 }
 
 export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
