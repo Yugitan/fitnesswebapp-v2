@@ -15,7 +15,10 @@ import { formatVolume } from "@xiaobai-amax/utils";
 import { ArrowLeft, Plus, Search, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { navigate, navigateBack } from "../../app/router";
+import { WorkoutCompletionPrompt } from "../../shared/components/WorkoutCompletionPrompt";
+import { useAuth } from "../../shared/hooks/use-auth";
 import { useExercises } from "../../shared/hooks/use-exercises";
+import { dismissAuthPrompt, openAuthDialog } from "../../shared/lib/auth-dialog";
 import { todayDate } from "../../shared/lib/dates";
 
 type WorkoutEditorPageProps = {
@@ -24,12 +27,14 @@ type WorkoutEditorPageProps = {
 
 export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
   const { exercises, byId } = useExercises();
+  const { user, loading: authLoading } = useAuth();
   const [date, setDate] = useState(todayDate());
   const [bundle, setBundle] = useState<WorkoutBundle | undefined>();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [notes, setNotes] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
+  const [completionPromptOpen, setCompletionPromptOpen] = useState(false);
   const returnToRecord = new URLSearchParams(window.location.search).get("returnTo") === "record";
 
   async function refresh(targetDate = date) {
@@ -74,6 +79,24 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
     refresh();
   }
 
+  function leaveEditor() {
+    if (returnToRecord) {
+      navigate("/record");
+      return;
+    }
+
+    navigate(bundle ? `/workouts/${bundle.workout.id}` : "/record");
+  }
+
+  function completeWorkout() {
+    if (!authLoading && !user && summary.exerciseCount > 0) {
+      setCompletionPromptOpen(true);
+      return;
+    }
+
+    leaveEditor();
+  }
+
   return (
     <div className="page editor-page">
       <header className="page-header compact">
@@ -86,14 +109,7 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
         </div>
         <button
           className="text-action"
-          onClick={() => {
-            if (returnToRecord) {
-              navigate("/record");
-              return;
-            }
-
-            navigateBack(bundle ? `/workouts/${bundle.workout.id}` : "/record");
-          }}
+          onClick={completeWorkout}
           type="button"
         >
           完成
@@ -262,6 +278,22 @@ export function WorkoutEditorPage({ workoutId }: WorkoutEditorPageProps) {
             </div>
           </section>
         </div>
+      ) : null}
+
+      {completionPromptOpen ? (
+        <WorkoutCompletionPrompt
+          exerciseCount={summary.exerciseCount}
+          onContinue={() => {
+            dismissAuthPrompt();
+            setCompletionPromptOpen(false);
+            leaveEditor();
+          }}
+          onLogin={() => {
+            setCompletionPromptOpen(false);
+            openAuthDialog();
+          }}
+          setCount={summary.setCount}
+        />
       ) : null}
     </div>
   );

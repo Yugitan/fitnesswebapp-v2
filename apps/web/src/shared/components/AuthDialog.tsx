@@ -93,7 +93,7 @@ export function AuthDialog({ open, onClose, onSuccess }: AuthDialogProps) {
           </form>
 
           <button className="auth-guest-action" onClick={onClose} type="button">继续游客模式</button>
-          <p className="auth-reminder-note">NOT NOW · 7 DAYS LATER</p>
+          <p className="auth-reminder-note">NOT NOW · 3 DAYS LATER</p>
         </div>
       </section>
     </div>

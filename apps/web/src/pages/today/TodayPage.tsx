@@ -46,9 +46,18 @@ export function TodayPage() {
         <p>{formatDate(todayDate())}</p>
         <h2>{summary.exerciseCount > 0 ? "今天已经开练了" : "今天还没记录训练"}</h2>
         <div className="hero-stats">
-          <span>{summary.exerciseCount} 动作</span>
-          <span>{summary.setCount} 组</span>
-          <span>{formatVolume(summary.totalVolume)}</span>
+          <span className="hero-stat">
+            <strong>{summary.exerciseCount}</strong>
+            <small>动作</small>
+          </span>
+          <span className="hero-stat">
+            <strong>{summary.setCount}</strong>
+            <small>组</small>
+          </span>
+          <span className="hero-stat hero-stat-volume">
+            <strong>{formatVolume(summary.totalVolume)}</strong>
+            <small>训练量</small>
+          </span>
         </div>
         <div className="hero-actions">
           <button className="btn btn-primary" onClick={() => navigate("/workouts/new?returnTo=record")} type="button">

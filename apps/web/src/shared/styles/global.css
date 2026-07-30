@@ -381,29 +381,44 @@ button {
 .hero-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0;
+  gap: 8px;
   margin-top: 28px;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 16px 0;
+  padding: 0;
 }
 
-.hero-stats span {
+.hero-stat {
   display: grid;
   min-width: 0;
-  gap: 4px;
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 0 10px;
-  color: rgba(255, 255, 255, 0.52);
-  font-size: 11px;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 11px 9px;
+  background: rgba(255, 255, 255, 0.06);
 }
 
-.hero-stats span:last-child {
-  border-right: 0;
+.hero-stat strong {
+  overflow: hidden;
+  color: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hero-stats span::first-letter {
-  color: white;
+.hero-stat small {
+  color: #ff6b43;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+.hero-stat-volume strong {
+  font-size: 16px;
+  letter-spacing: -0.06em;
 }
 
 .hero-actions {
@@ -1838,11 +1853,13 @@ button {
 }
 
 .auth-submit {
+  position: relative;
   display: flex;
   width: 100%;
   min-height: 48px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  gap: 10px;
   margin-top: 2px;
   border: 0;
   border-radius: 6px;
@@ -1851,6 +1868,11 @@ button {
   color: #fff;
   font-size: 14px;
   font-weight: 900;
+}
+
+.auth-submit svg {
+  position: absolute;
+  right: 15px;
 }
 
 .auth-submit:disabled {
@@ -1881,6 +1903,159 @@ button {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.workout-completion-prompt {
+  position: fixed;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: 50;
+  width: min(calc(100% - 24px), 369px);
+  transform: translateX(-50%);
+  overflow: hidden;
+  border-radius: 8px;
+  padding: 16px;
+  background: #181818;
+  color: #fff;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.3);
+}
+
+.workout-completion-prompt::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: #ff4d1c;
+  content: "";
+}
+
+.workout-completion-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.48);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+}
+
+.workout-completion-topline span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #ff4d1c;
+}
+
+.workout-completion-topline small {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 9px;
+}
+
+.workout-completion-heading {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  margin: 14px 0;
+}
+
+.workout-completion-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 7px;
+  background: #ff4d1c;
+}
+
+.workout-completion-heading h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.workout-completion-heading p {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.workout-completion-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.workout-completion-stats span {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 9px 5px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.workout-completion-stats span + span {
+  border-left: 1px solid rgba(255, 255, 255, 0.11);
+}
+
+.workout-completion-stats strong {
+  color: #fff;
+  font-size: 14px;
+}
+
+.workout-completion-stats svg {
+  color: #ff4d1c;
+}
+
+.workout-completion-login,
+.workout-completion-continue {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  font-weight: 900;
+}
+
+.workout-completion-login {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 0 14px;
+  background: #ff4d1c;
+  color: #fff;
+  font-size: 13px;
+}
+
+.workout-completion-continue {
+  min-height: 35px;
+  margin-top: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.67);
+  font-size: 12px;
+}
+
+.workout-completion-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.31);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-align: center;
 }
 
