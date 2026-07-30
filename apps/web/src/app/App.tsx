@@ -1,10 +1,11 @@
-import { Dumbbell, History, Home, PlusCircle, WifiOff } from "lucide-react";
+import { BarChart3, Dumbbell, History, Home, PlusCircle, WifiOff } from "lucide-react";
 import { useEffect } from "react";
 import { useState } from "react";
 import { ExerciseDetailPage } from "../pages/exercises/ExerciseDetailPage";
 import { ExercisesPage } from "../pages/exercises/ExercisesPage";
 import { FavoritesPage } from "../pages/favorites/FavoritesPage";
 import { HistoryPage } from "../pages/history/HistoryPage";
+import { AnalysisPage } from "../pages/analysis/AnalysisPage";
 import { RecordPage } from "../pages/record/RecordPage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { TemplatesPage } from "../pages/templates/TemplatesPage";
@@ -19,8 +20,9 @@ import {
   shouldShowAuthPrompt,
 } from "../shared/lib/auth-dialog";
 import { navigate, useAppRoute } from "./router";
+import type { AuthUser } from "@xiaobai-amax/data-client";
 
-function resolvePage(parts: string[]) {
+function resolvePage(parts: string[], user: AuthUser | null, authLoading: boolean) {
   if (parts.length === 0) {
     return <TodayPage />;
   }
@@ -47,6 +49,10 @@ function resolvePage(parts: string[]) {
 
   if (parts[0] === "history") {
     return <HistoryPage />;
+  }
+
+  if (parts[0] === "analysis") {
+    return <AnalysisPage authLoading={authLoading} user={user} />;
   }
 
   if (parts[0] === "favorites") {
@@ -107,6 +113,7 @@ export function App() {
   const isWorkoutDetail =
     route.parts[0] === "workouts" && Boolean(route.parts[1]) && route.parts[1] !== "new";
   const hideNav = isExerciseDetail || isWorkoutDetail || route.parts[0] === "settings" || route.parts[0] === "templates";
+  const visibleNavItems = user ? [...navItems, { path: "/analysis", label: "分析", icon: BarChart3 }] : navItems;
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0 });
@@ -134,11 +141,11 @@ export function App() {
       <div className="phone-frame">
         <OfflineNotice />
         <main className={hideNav ? "app-main app-main-full" : "app-main"}>
-          {resolvePage(route.parts)}
+          {resolvePage(route.parts, user, authLoading)}
         </main>
         {!hideNav ? (
           <nav className="bottom-nav" aria-label="主导航">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
               const active =
                 item.path === "/"

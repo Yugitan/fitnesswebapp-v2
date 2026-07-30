@@ -1,16 +1,18 @@
 import { summarizeWorkout } from "@xiaobai-amax/domain";
 import { getTodayWorkout, listRecentWorkoutBundles } from "@xiaobai-amax/data-client";
 import { formatVolume } from "@xiaobai-amax/utils";
-import { Heart, History, Library, PlusCircle, Search, Settings } from "lucide-react";
+import { BarChart3, Heart, History, Library, PlusCircle, Search, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { WorkoutSummaryCard } from "../../entities/workout/workout-summary-card";
 import { useExercises } from "../../shared/hooks/use-exercises";
+import { useAuth } from "../../shared/hooks/use-auth";
 import { formatDate, todayDate } from "../../shared/lib/dates";
 import { navigate } from "../../app/router";
 import type { WorkoutBundle } from "@xiaobai-amax/domain";
 
 export function TodayPage() {
   const { byId } = useExercises();
+  const { user } = useAuth();
   const [todayBundle, setTodayBundle] = useState<WorkoutBundle | undefined>();
   const [recentBundles, setRecentBundles] = useState<WorkoutBundle[]>([]);
 
@@ -85,6 +87,14 @@ export function TodayPage() {
           <span>看历史</span>
         </button>
       </section>
+
+      {user ? (
+        <button className="today-analysis-link" onClick={() => navigate("/analysis")} type="button">
+          <span className="today-analysis-icon"><BarChart3 size={19} /></span>
+          <span><strong>查看本周分析</strong><small>训练量、肌群平衡与下一次建议</small></span>
+          <span aria-hidden="true">›</span>
+        </button>
+      ) : null}
 
       <section className="section">
         <div className="section-title">

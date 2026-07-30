@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: xiaobai-amax-api
+    runtime: python
+    buildCommand: bash scripts/prepare-exercise-dataset.sh && python3 -m pip install -r apps/api/requirements.txt
+    startCommand: cd apps/api && alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_HOSTS
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: FORCE_HTTPS
+        value: "true"

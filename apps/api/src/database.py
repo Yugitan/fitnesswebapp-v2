@@ -93,6 +93,15 @@ def database_url_from_path(path: Path) -> str:
     return f"sqlite+pysqlite:///{path.resolve()}"
 
 
+def normalize_database_url(database_url: str) -> str:
+    """Accept provider connection strings while consistently using psycopg 3."""
+    if database_url.startswith("postgres://"):
+        return f"postgresql+psycopg://{database_url.removeprefix('postgres://')}"
+    if database_url.startswith("postgresql://"):
+        return f"postgresql+psycopg://{database_url.removeprefix('postgresql://')}"
+    return database_url
+
+
 def parse_datetime(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
@@ -113,7 +122,7 @@ class SqlStore:
 
     def __init__(self, database_url: str, *, initialize_schema: bool = False):
         connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
-        self.engine = create_engine(database_url, future=True, pool_pre_ping=True, connect_args=connect_args)
+        self.engine = create_engine(normalize_database_url(database_url), future=True, pool_pre_ping=True, connect_args=connect_args)
         self.sessions = sessionmaker(self.engine, expire_on_commit=False)
         if initialize_schema:
             Base.metadata.create_all(self.engine)

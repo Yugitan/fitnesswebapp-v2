@@ -4,7 +4,7 @@ import { clearAuthToken, getAuthHeaders, getAuthToken } from "./auth-storage";
 export * from "./auth";
 export { AUTH_CHANGE_EVENT } from "./auth-storage";
 
-const API_BASE = "/api";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
 export type TrainingTemplate = {
   id: string;
@@ -107,6 +107,17 @@ export function listMonthWorkoutBundles(month: string) {
 
 export function listAllWorkoutBundles() {
   return request<WorkoutBundle[]>("/workouts");
+}
+
+export function listWorkoutBundlesSince(start: string) {
+  return request<WorkoutBundle[]>(`/workouts?start=${encodeURIComponent(start)}`);
+}
+
+export function getExerciseBodyParts(exerciseIds: string[]) {
+  return request<Record<string, string>>("/analysis/exercise-body-parts", {
+    method: "POST",
+    body: JSON.stringify({ exerciseIds }),
+  });
 }
 
 export async function listWorkouts(): Promise<Workout[]> {

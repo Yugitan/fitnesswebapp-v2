@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
-export const APP_BASE_PATH = "/Amax";
+const configuredBasePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+export const APP_BASE_PATH = configuredBasePath === "/" ? "" : configuredBasePath;
 
 export type Route = {
   path: string;
@@ -13,6 +14,7 @@ function normalizeRoutePath(path: string): string {
 }
 
 function isAppPath(pathname: string): boolean {
+  if (!APP_BASE_PATH) return pathname.startsWith("/");
   return pathname === APP_BASE_PATH || pathname.startsWith(`${APP_BASE_PATH}/`);
 }
 
@@ -24,6 +26,8 @@ function readLegacyHashPath(): string | null {
 function readBrowserPath(): string {
   const { pathname } = window.location;
 
+  if (!APP_BASE_PATH) return normalizeRoutePath(pathname);
+
   if (!isAppPath(pathname)) {
     return "/";
   }
@@ -34,11 +38,17 @@ function readBrowserPath(): string {
 
 function toBrowserPath(path: string): string {
   const routePath = normalizeRoutePath(path);
+  if (!APP_BASE_PATH) return routePath;
   return routePath === "/" ? APP_BASE_PATH : `${APP_BASE_PATH}${routePath}`;
 }
 
 function syncAddressToBasePath(): void {
   const legacyHashPath = readLegacyHashPath();
+
+  if (!APP_BASE_PATH) {
+    if (legacyHashPath) window.history.replaceState({}, "", legacyHashPath);
+    return;
+  }
 
   if (!legacyHashPath && isAppPath(window.location.pathname)) {
     return;

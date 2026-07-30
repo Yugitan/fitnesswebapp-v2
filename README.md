@@ -16,12 +16,12 @@ npm run dev
 开发服务默认访问：
 
 ```txt
-http://localhost:5173/Amax
+http://localhost:5173
 ```
 
 `npm run dev` 会同时启动：
 
-- Web：`http://localhost:5173/Amax`
+- Web：`http://localhost:5173`
 - FastAPI：`http://127.0.0.1:8787/api`
 - Swagger 文档：`http://127.0.0.1:8787/docs`
 
@@ -55,7 +55,7 @@ cd apps/api
 - 注册或登录时，当前游客数据会自动合并到账号
 - 游客关闭登录提示后，3 天内不会再次弹出
 
-应用已配置 Vite `base` 为 `/Amax/`，根路径 `/` 在开发和预览服务中会跳转到 `/Amax`。
+应用使用域名根路径 `/`，便于部署到 Cloudflare Pages 等静态站点服务。
 
 验证命令：
 

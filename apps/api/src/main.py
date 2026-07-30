@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import math
 import os
 import re
@@ -17,6 +18,7 @@ from uuid import uuid4
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -34,10 +36,34 @@ PASSWORD_ITERATIONS = 310_000
 SESSION_DAYS = 30
 LOGIN_MAX_ATTEMPTS = max(1, int(os.getenv("LOGIN_MAX_ATTEMPTS", "5")))
 LOGIN_WINDOW_SECONDS = max(1, int(os.getenv("LOGIN_WINDOW_SECONDS", "900")))
+EXERCISE_DATA_PATH = Path(os.getenv(
+    "EXERCISE_DATA_PATH",
+    Path(__file__).resolve().parents[3] / "动作库" / "exercises-dataset" / "data" / "exercises.json",
+))
+exercise_body_parts: Optional[Dict[str, str]] = None
+exercise_body_parts_lock = threading.Lock()
 
 
 def now_datetime() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def get_exercise_body_parts() -> Dict[str, str]:
+    global exercise_body_parts
+    if exercise_body_parts is not None:
+        return exercise_body_parts
+
+    with exercise_body_parts_lock:
+        if exercise_body_parts is None:
+            with EXERCISE_DATA_PATH.open(encoding="utf-8") as source:
+                records = json.load(source)
+            exercise_body_parts = {
+                str(record["id"]): str(record["body_part"])
+                for record in records
+                if record.get("id") and record.get("body_part")
+            }
+
+    return exercise_body_parts
 
 
 def iso_datetime(value: datetime) -> str:
@@ -105,6 +131,10 @@ class ChangePasswordInput(BaseModel):
     currentPassword: str
     newPassword: str
     confirmPassword: str
+
+
+class ExerciseBodyPartsInput(BaseModel):
+    exerciseIds: list[str] = Field(max_length=500)
 
 
 class UserTemplateCreate(BaseModel):
@@ -465,6 +495,19 @@ def create_app(data_file: Optional[Path] = None, *, database_url: Optional[str] 
     app = FastAPI(title="小白 Amax API", version="0.3.0")
     allowed_hosts = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or ["*"])
+    cors_allowed_origins = [
+        origin.strip().rstrip("/")
+        for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    if cors_allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_allowed_origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
     if os.getenv("FORCE_HTTPS", "false").lower() in {"1", "true", "yes"}:
         app.add_middleware(HTTPSRedirectMiddleware)
     login_limiter = LoginAttemptLimiter(LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS)
@@ -732,13 +775,28 @@ def create_app(data_file: Optional[Path] = None, *, database_url: Optional[str] 
         return bundle_for(data, workout)
 
     @app.get("/api/workouts")
-    def list_workouts(month: Optional[str] = None, principal: Principal = Depends(get_principal)):
+    def list_workouts(
+        month: Optional[str] = None,
+        start: Optional[str] = None,
+        principal: Principal = Depends(get_principal),
+    ):
         if month and not MONTH_PATTERN.fullmatch(month):
             raise HTTPException(400, "month 必须是 YYYY-MM")
+        if start and not DATE_PATTERN.fullmatch(start):
+            raise HTTPException(400, "start 必须是 YYYY-MM-DD")
         data = store.read()
-        workouts = [item for item in owned_workouts(data, principal) if not month or item["date"].startswith(month)]
+        workouts = [
+            item for item in owned_workouts(data, principal)
+            if (not month or item["date"].startswith(month)) and (not start or item["date"] >= start)
+        ]
         bundles = [bundle_for(data, item) for item in sorted(workouts, key=lambda item: item["date"], reverse=True)]
         return [bundle for bundle in bundles if bundle and bundle["exercises"]]
+
+    @app.post("/api/analysis/exercise-body-parts")
+    def list_exercise_body_parts(payload: ExerciseBodyPartsInput, principal: Principal = Depends(get_principal)):
+        del principal
+        by_id = get_exercise_body_parts()
+        return {exercise_id: by_id[exercise_id] for exercise_id in set(payload.exerciseIds) if exercise_id in by_id}
 
     @app.post("/api/workouts")
     def create_workout(payload: WorkoutCreate, principal: Principal = Depends(get_principal)):

@@ -12,7 +12,8 @@
     "dev:web": "npm --workspace @xiaobai-amax/web run dev",
     "dev:api": "npm --workspace @xiaobai-amax/api run dev",
     "start:page": "bash scripts/start-web.sh",
-    "build": "npm --workspace @xiaobai-amax/web run build",
+    "prepare:exercise-data": "bash scripts/prepare-exercise-dataset.sh",
+    "build": "npm run prepare:exercise-data && npm --workspace @xiaobai-amax/web run build",
     "preview": "npm --workspace @xiaobai-amax/web run preview",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
     "test:api": "bash scripts/test-api.sh"
