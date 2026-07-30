@@ -100,7 +100,7 @@ function optionalNumber(value: unknown, field: string, integer = false) {
 }
 
 async function handle(request: Request, env: Env): Promise<Response> {
-  if (request.method === "OPTIONS") return empty();
+  if (request.method === "OPTIONS") return respond(request, env, empty());
   const sql = neon(env.DATABASE_URL); const url = new URL(request.url); const path = url.pathname;
   if (path === "/api/health") return json({ ok: true, framework: "Cloudflare Workers" });
   if (path === "/api/auth/register" && request.method === "POST") {
