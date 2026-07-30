@@ -17,6 +17,8 @@ const recommendations = [
 
 const now = () => new Date().toISOString();
 const id = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
+// Cloudflare Workers caps Web Crypto PBKDF2 at 100,000 iterations.
+const passwordHashIterations = 100_000;
 const error = (status: number, message: string): never => { throw Object.assign(new Error(message), { status }); };
 const text = (value: unknown) => typeof value === "string" ? value : "";
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json; charset=utf-8" } });
@@ -52,8 +54,8 @@ const unb64 = (value: string) => Uint8Array.from(atob(value.replaceAll("-", "+")
 async function passwordHash(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 310000 }, key, 256);
-  return `pbkdf2_sha256$310000$${b64(salt)}$${b64(new Uint8Array(bits))}`;
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: passwordHashIterations }, key, 256);
+  return `pbkdf2_sha256$${passwordHashIterations}$${b64(salt)}$${b64(new Uint8Array(bits))}`;
 }
 async function passwordMatches(password: string, encoded: string) {
   try {
