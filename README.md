@@ -65,6 +65,10 @@ npm run test:api
 npm run build
 ```
 
+## 免费部署
+
+Cloudflare Pages + Workers + Neon 的部署步骤见 `docs/deploy-cloudflare-workers-neon.md`。该方案不使用 Render；Neon 的数据库连接串必须使用 Cloudflare Worker Secret 保存，不能提交到仓库。
+
 ## 架构
 
 - 产品需求：`PRD.md`

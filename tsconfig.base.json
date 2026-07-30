@@ -25,5 +25,6 @@
       "@xiaobai-amax/utils": ["packages/utils/src/index.ts"]
     }
   },
-  "include": ["apps", "packages", "scripts"]
+  "include": ["apps", "packages", "scripts"],
+  "exclude": ["apps/worker"]
 }

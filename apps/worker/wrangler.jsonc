@@ -1,0 +1,6 @@
+{
+  "name": "xiaobai-amax-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-30",
+  "workers_dev": true
+}

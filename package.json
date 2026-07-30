@@ -14,19 +14,21 @@
     "start:page": "bash scripts/start-web.sh",
     "prepare:exercise-data": "bash scripts/prepare-exercise-dataset.sh",
     "build": "npm run prepare:exercise-data && npm --workspace @xiaobai-amax/web run build",
+    "typecheck:worker": "npm --workspace @xiaobai-amax/worker run typecheck",
     "preview": "npm --workspace @xiaobai-amax/web run preview",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
     "test:api": "bash scripts/test-api.sh"
   },
   "devDependencies": {
+    "@types/node": "^22.13.14",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@types/node": "^22.13.14",
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "^5.8.3",
     "vite": "^7.0.5"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
